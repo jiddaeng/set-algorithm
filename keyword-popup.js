@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const keywordType = document.getElementById("keywordType");
   const addKeywordButton = document.getElementById("addKeywordButton");
   const keywordList = document.getElementById("keywordList");
+  const currentPackageLabel = document.getElementById("currentPackageLabel");
 
   let currentPackageName = "study";
   let currentKeywords = { include: [], exclude: [] };
@@ -83,6 +84,14 @@ document.addEventListener("DOMContentLoaded", () => {
     return nextMap;
   }
 
+  function renderPackageInfo() {
+    if (!currentPackageLabel) {
+      return;
+    }
+
+    currentPackageLabel.innerHTML = `현재 패키지: <strong>${currentPackageName}</strong>`;
+  }
+
   function renderKeywords() {
     if (!keywordList) {
       return;
@@ -113,6 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
     safeStorageGet(["selectedPackage", "customKeywords"]).then(result => {
       currentPackageName = result.selectedPackage || "study";
       currentKeywords = normalizeKeywordsForPackage(result.customKeywords, currentPackageName);
+      renderPackageInfo();
       renderKeywords();
     });
   }

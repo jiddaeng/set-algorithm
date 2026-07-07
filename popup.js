@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentPackageName = "study";
   let currentCustomKeywords = { include: [], exclude: [] };
 
+
   function normalizeKeywordsForPackage(rawKeywords, packageName = currentPackageName) {
     if (!rawKeywords || typeof rawKeywords !== "object" || Array.isArray(rawKeywords)) {
       return { include: [], exclude: [] };
@@ -21,6 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const entry = rawKeywords[packageName] || rawKeywords[packageName?.toLowerCase()] || {};
+   
     return {
       include: [...(entry.include || [])],
       exclude: [...(entry.exclude || [])]
@@ -52,6 +54,42 @@ document.addEventListener("DOMContentLoaded", () => {
 
     nextMap[packageName] = packageKeywords;
     return nextMap;
+  }
+
+  function refreshPackageSelect(rawKeywords = null) {
+    if (!select) {
+      return;
+    }
+
+    const customPackages = getCustomPackageEntries(rawKeywords);
+    const optionValues = new Set(["study", "workout", "development", "reading"]);
+
+    customPackages.forEach(pkg => optionValues.add(pkg.key));
+
+    select.innerHTML = "";
+
+    [
+      { value: "study", label: "Study Pack" },
+      { value: "workout", label: "Workout Pack" },
+      { value: "development", label: "Development Pack" },
+      { value: "reading", label: "Reading Pack" },
+      ...customPackages.map(pkg => ({ value: pkg.key, label: pkg.label }))
+    ].forEach(optionData => {
+      if (!optionValues.has(optionData.value)) {
+        return;
+      }
+
+      const option = document.createElement("option");
+      option.value = optionData.value;
+      option.textContent = optionData.label;
+      select.appendChild(option);
+    });
+
+    if (currentPackageName && [...select.options].some(option => option.value === currentPackageName)) {
+      select.value = currentPackageName;
+    } else if (select.options.length) {
+      select.value = select.options[0].value;
+    }
   }
 
   function safeStorageGet(keys, fallback = {}) {
@@ -147,22 +185,30 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function applySelectedPackage(packageName) {
+    const nextPackageName = packageName || currentPackageName || "study";
+    currentPackageName = nextPackageName;
+
+    return safeStorageSet({ selectedPackage: nextPackageName }).then(() => {
+      loadPopupState();
+      notifyActiveTabRefresh();
+    });
+  }
+
   loadPopupState();
 
+  select?.addEventListener("change", () => {
+    applySelectedPackage(select.value);
+  });
+
   button?.addEventListener("click", () => {
-    const packageName = select?.value || currentPackageName || "study";
-    currentPackageName = packageName;
-    safeStorageSet({ selectedPackage: packageName }).then(() => {
-      loadPopupState();
-    });
+    applySelectedPackage(select?.value || currentPackageName || "study");
   });
 
   manageKeywordsButton?.addEventListener("click", () => {
     const packageName = select?.value || currentPackageName || "study";
-    currentPackageName = packageName;
 
-    safeStorageSet({ selectedPackage: packageName }).then(() => {
-      loadPopupState();
+    applySelectedPackage(packageName).then(() => {
       chrome.windows?.create({
         url: chrome.runtime.getURL("keyword-popup.html"),
         type: "popup",
@@ -171,6 +217,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
   });
+
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === "local" && (changes.customKeywords || changes.selectedPackage || changes.filterStats)) {

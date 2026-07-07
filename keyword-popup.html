@@ -31,12 +31,22 @@
         max-height: 220px;
         overflow-y: auto;
       }
+
+      .current-package {
+        margin: 8px 0 12px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        background: #1f2937;
+        color: #e5e7eb;
+        font-size: 13px;
+      }
     </style>
   </head>
   <body>
     <div class="container">
       <h1>키워드 관리</h1>
       <p>현재 패키지의 키워드를 추가하거나 삭제하세요.</p>
+      <div id="currentPackageLabel" class="current-package">현재 패키지: study</div>
 
       <div class="panel">
         <h2>키워드 추가</h2>
