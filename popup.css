@@ -1,0 +1,43 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 12px;
+  width: 260px;
+  background: #111827;
+  color: #f9fafb;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+select, button, input {
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #4b5563;
+}
+
+button {
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+}
+
+.panel {
+  background: #1f2937;
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.panel h2 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.small {
+  font-size: 11px;
+  color: #cbd5e1;
+}

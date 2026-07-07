@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Set Algorithm - Keywords</title>
+    <link rel="stylesheet" href="popup.css" />
+    <style>
+      body {
+        width: 360px;
+      }
+
+      .keyword-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 0;
+        border-bottom: 1px solid #374151;
+      }
+
+      .keyword-row:last-child {
+        border-bottom: none;
+      }
+
+      .keyword-actions button {
+        padding: 4px 8px;
+      }
+
+      .keyword-list {
+        max-height: 220px;
+        overflow-y: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>키워드 관리</h1>
+      <p>현재 패키지의 키워드를 추가하거나 삭제하세요.</p>
+
+      <div class="panel">
+        <h2>키워드 추가</h2>
+        <input id="keywordInput" type="text" placeholder="예: 집중, coding" />
+        <select id="keywordType">
+          <option value="include">적합 키워드</option>
+          <option value="exclude">부적합 키워드</option>
+        </select>
+        <button id="addKeywordButton">추가</button>
+      </div>
+
+      <div class="panel">
+        <h2>현재 패키지 키워드</h2>
+        <div id="keywordList" class="keyword-list">로딩 중...</div>
+      </div>
+    </div>
+
+    <script src="packages.js"></script>
+    <script src="keyword-popup.js"></script>
+  </body>
+</html>
