@@ -6,6 +6,11 @@ let isProcessing = false;
 let lastPackageName = DEFAULT_PACKAGE;
 let contentAlive = true;
 let pendingContentReprocess = false;
+const isYoutubeHost = window.location.hostname.includes("youtube.com");
+
+function isShortsPage() {
+    return window.location.pathname.startsWith("/shorts");
+}
 
 function safeStorageGet(keys, fallback = {}) {
     if (!contentAlive || typeof chrome === "undefined" || !chrome.storage?.local) {
@@ -15,6 +20,10 @@ function safeStorageGet(keys, fallback = {}) {
     return new Promise(resolve => {
         try {
             chrome.storage.local.get(keys, result => {
+                if (chrome.runtime?.lastError) {
+                    resolve(fallback);
+                    return;
+                }
                 if (!contentAlive) {
                     resolve(fallback);
                     return;
@@ -36,7 +45,9 @@ function safeStorageSet(data) {
 
     return new Promise(resolve => {
         try {
-            chrome.storage.local.set(data, () => resolve());
+            chrome.storage.local.set(data, () => {
+                resolve();
+            });
         } catch (error) {
             contentAlive = false;
             console.warn("Set Algorithm storage write failed:", error);
@@ -75,6 +86,7 @@ async function applyPackageFilter(packageName) {
 
         const text = extractVideoText(video);
         const score = calculateScore(text, packageName, config);
+        const alreadyKept = video.dataset.saProcessed === "1" && video.style.display !== "none";
 
         if (score <= 0) {
             video.style.display = "none";
@@ -84,6 +96,14 @@ async function applyPackageFilter(packageName) {
             video.style.display = "";
             video.dataset.saProcessed = "1";
             visibleCount += 1;
+
+            const matchedKeywords = getMatchedIncludeKeywords(text, packageName, config);
+            if (!alreadyKept) {
+                const titlePreview = (text.split("\n")[0] || "제목 없음").slice(0, 80);
+                console.log(
+                    `[Set Algorithm] ${packageName}: 영상 유지 (score ${score}) - "${titlePreview}" [${matchedKeywords.join(", ") || "없음"}]`
+                );
+            }
         }
     });
 
@@ -106,6 +126,10 @@ async function getSelectedPackage() {
 }
 
 async function runSetAlgorithm() {
+    if (!isYoutubeHost || isShortsPage()) {
+        return;
+    }
+
     if (!contentAlive) {
         return;
     }
@@ -138,29 +162,28 @@ async function runSetAlgorithm() {
     }
 }
 
-createObserver(runSetAlgorithm);
-window.addEventListener("load", runSetAlgorithm);
-window.addEventListener("beforeunload", () => {
-    contentAlive = false;
-});
+if (isYoutubeHost) {
+    createObserver(runSetAlgorithm);
+    window.addEventListener("load", runSetAlgorithm);
 
-if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
-    chrome.storage.onChanged.addListener((changes, areaName) => {
-        if (areaName === "local" && (changes.selectedPackage || changes.customKeywords || changes.filterStats)) {
-            runSetAlgorithm();
-        }
-    });
+    if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
+        chrome.storage.onChanged.addListener((changes, areaName) => {
+            if (areaName === "local" && (changes.selectedPackage || changes.customKeywords)) {
+                runSetAlgorithm();
+            }
+        });
+    }
+
+    if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+            if (message?.type === "SET_ALGORITHM_REFRESH") {
+                runSetAlgorithm();
+                sendResponse({ ok: true });
+                return true;
+            }
+            return false;
+        });
+    }
+
+    console.log("Set Algorithm 실행됨");
 }
-
-if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        if (message?.type === "SET_ALGORITHM_REFRESH") {
-            runSetAlgorithm();
-            sendResponse({ ok: true });
-            return true;
-        }
-        return false;
-    });
-}
-
-console.log("Set Algorithm 실행됨");

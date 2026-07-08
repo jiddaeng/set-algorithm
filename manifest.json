@@ -8,15 +8,13 @@
   ],
 
   "host_permissions": [
-    "https://www.youtube.com/*",
-    "https://www.instagram.com/*"
+    "https://www.youtube.com/*"
   ],
 
   "content_scripts": [
     {
       "matches": [
-        "https://www.youtube.com/*",
-        "https://www.instagram.com/*"
+        "https://www.youtube.com/*"
       ],
       "js": [
         "packages.js",
@@ -24,7 +22,7 @@
         "utils.js",
         "observer.js",
         "content.js",
-        "reels.js"
+        "shorts.js"
       ]
     }
   ],

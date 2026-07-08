@@ -59,6 +59,10 @@ async function getPackageConfigAsync(packageName) {
     return new Promise(resolve => {
         try {
             chrome.storage.local.get(["customKeywords"], result => {
+                if (chrome.runtime?.lastError) {
+                    resolve(config);
+                    return;
+                }
                 const customKeywords = normalizeCustomKeywordsForPackage(result.customKeywords, resolvedName);
                 resolve({
                     ...config,
@@ -76,6 +80,16 @@ async function getPackageConfigAsync(packageName) {
 function getPackageConfig(packageName) {
     const resolvedName = resolvePackageName(packageName);
     return PACKAGE_CONFIG_LOCAL[resolvedName] || PACKAGE_CONFIG_LOCAL[DEFAULT_PACKAGE_LOCAL];
+}
+
+function getMatchedIncludeKeywords(title, packageName = DEFAULT_PACKAGE_LOCAL, configOverride = null) {
+    const text = normalizeText(title);
+    const config = configOverride || getPackageConfig(packageName);
+
+    return (config.include || []).filter(keyword => {
+        const normalizedKeyword = normalizeText(keyword);
+        return normalizedKeyword && text.includes(normalizedKeyword);
+    });
 }
 
 function calculateScore(title, packageName = DEFAULT_PACKAGE_LOCAL, configOverride = null) {
@@ -101,6 +115,7 @@ function calculateScore(title, packageName = DEFAULT_PACKAGE_LOCAL, configOverri
 if (typeof window !== "undefined") {
     window.calculateScore = calculateScore;
     window.getPackageConfig = getPackageConfig;
+    window.getMatchedIncludeKeywords = getMatchedIncludeKeywords;
 }
 
 if (typeof module !== "undefined") {
@@ -109,6 +124,7 @@ if (typeof module !== "undefined") {
         getPackageConfig,
         getPackageConfigAsync,
         normalizeCustomKeywordsForPackage,
+        getMatchedIncludeKeywords,
         resolvePackageName
     };
 }
