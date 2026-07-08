@@ -1,6 +1,17 @@
 // ================================
-// Set Algorithm - content.js
+// Set Algorithm - YouTube content filter
 // ================================
+
+const YOUTUBE_VIDEO_SELECTOR = [
+    "ytd-rich-item-renderer",
+    "ytd-rich-grid-media",
+    "ytd-video-renderer",
+    "ytd-compact-video-renderer",
+    "ytd-grid-video-renderer",
+    "ytd-reel-item-renderer",
+    "ytd-playlist-renderer",
+    "ytd-radio-renderer"
+].join(", ");
 
 let isProcessing = false;
 let lastPackageName = DEFAULT_PACKAGE;
@@ -46,27 +57,63 @@ function safeStorageSet(data) {
 }
 
 function getVideoCandidates() {
-    return Array.from(
-        document.querySelectorAll(
-            "ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer"
-        )
-    );
+    if (!location.hostname.includes("youtube.com")) {
+        return [];
+    }
+
+    return Array.from(document.querySelectorAll(YOUTUBE_VIDEO_SELECTOR));
+}
+
+function readTextOrAttribute(element, selector, attribute = null) {
+    const target = element.querySelector(selector);
+    if (!target) {
+        return "";
+    }
+
+    if (attribute) {
+        return target.getAttribute(attribute) || "";
+    }
+
+    return target.innerText || target.textContent || "";
 }
 
 function extractVideoText(video) {
-    const title =
-        video.querySelector("h3, h4, yt-formatted-string, #video-title, #title")?.innerText || "";
-    const meta =
-        video.querySelector("#metadata, #channel-name, #text")?.innerText || "";
-    return [title, meta, video.innerText].join("\n");
+    const parts = [
+        video.getAttribute("aria-label") || "",
+        video.getAttribute("title") || "",
+        readTextOrAttribute(video, "#video-title", "title"),
+        readTextOrAttribute(video, "#video-title"),
+        readTextOrAttribute(video, "h3"),
+        readTextOrAttribute(video, "h4"),
+        readTextOrAttribute(video, "#metadata"),
+        readTextOrAttribute(video, "#channel-name"),
+        readTextOrAttribute(video, "#text"),
+        video.innerText || video.textContent || ""
+    ];
+
+    return parts.filter(Boolean).join("\n");
+}
+
+function setVideoVisibility(video, shouldKeep) {
+    video.style.display = shouldKeep ? "" : "none";
+    video.dataset.saProcessed = "1";
+}
+
+async function getFilterState(packageName) {
+    const result = await safeStorageGet(["filterMode"], {});
+    const config = await getPackageConfigAsync(packageName);
+
+    return {
+        config,
+        filterMode: normalizeFilterMode(result.filterMode || "purpose")
+    };
 }
 
 async function applyPackageFilter(packageName) {
     const videos = getVideoCandidates();
     let hiddenCount = 0;
     let visibleCount = 0;
-
-    const config = await getPackageConfigAsync(packageName);
+    const { config, filterMode } = await getFilterState(packageName);
 
     videos.forEach(video => {
         if (!video || !video.isConnected) {
@@ -74,16 +121,13 @@ async function applyPackageFilter(packageName) {
         }
 
         const text = extractVideoText(video);
-        const score = calculateScore(text, packageName, config);
+        const shouldKeep = shouldKeepContent(text, packageName, config, filterMode);
+        setVideoVisibility(video, shouldKeep);
 
-        if (score <= 0) {
-            video.style.display = "none";
-            video.dataset.saProcessed = "1";
-            hiddenCount += 1;
-        } else {
-            video.style.display = "";
-            video.dataset.saProcessed = "1";
+        if (shouldKeep) {
             visibleCount += 1;
+        } else {
+            hiddenCount += 1;
         }
     });
 
@@ -91,12 +135,15 @@ async function applyPackageFilter(packageName) {
         filterStats: {
             total: videos.length,
             kept: visibleCount,
-            removed: hiddenCount
+            removed: hiddenCount,
+            filterMode,
+            packageName,
+            updatedAt: new Date().toISOString()
         }
     });
 
     if (hiddenCount > 0 || visibleCount > 0) {
-        console.log(`[Set Algorithm] ${packageName}: ${hiddenCount}개 숨김, ${visibleCount}개 유지`);
+        console.log(`[Set Algorithm] ${packageName}/${filterMode}: hidden ${hiddenCount}, kept ${visibleCount}`);
     }
 }
 
@@ -140,13 +187,14 @@ async function runSetAlgorithm() {
 
 createObserver(runSetAlgorithm);
 window.addEventListener("load", runSetAlgorithm);
+window.addEventListener("yt-navigate-finish", runSetAlgorithm);
 window.addEventListener("beforeunload", () => {
     contentAlive = false;
 });
 
 if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
     chrome.storage.onChanged.addListener((changes, areaName) => {
-        if (areaName === "local" && (changes.selectedPackage || changes.customKeywords || changes.filterStats)) {
+        if (areaName === "local" && (changes.selectedPackage || changes.customKeywords || changes.filterMode)) {
             runSetAlgorithm();
         }
     });
@@ -163,4 +211,4 @@ if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
     });
 }
 
-console.log("Set Algorithm 실행됨");
+console.log("Set Algorithm content filter loaded");

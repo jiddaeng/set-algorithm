@@ -11,51 +11,98 @@ function getCustomKeywords() {
 }
 
 const PACKAGE_CONFIG = {
+    kids: {
+        label: "Kids Safe Pack",
+        include: [
+            "kids",
+            "children",
+            "family",
+            "education",
+            "learning",
+            "science",
+            "story",
+            "cartoon",
+            "animation",
+            "동요",
+            "동화",
+            "어린이",
+            "키즈",
+            "교육",
+            "과학",
+            "놀이"
+        ],
+        exclude: [
+            "adult",
+            "19+",
+            "violence",
+            "violent",
+            "fight",
+            "horror",
+            "scary",
+            "blood",
+            "weapon",
+            "gun",
+            "drama",
+            "prank",
+            "gambling",
+            "casino",
+            "욕설",
+            "폭력",
+            "공포",
+            "도박",
+            "성인",
+            "싸움",
+            "무서운",
+            "잔인"
+        ]
+    },
     study: {
         label: "Study Pack",
         include: [
             "study",
             "study with me",
             "studying",
-            "공부",
-            "공부 브이로그",
-            "스터디",
             "focus",
             "focused",
             "deep work",
             "pomodoro",
-            "집중",
             "exam",
             "test",
+            "lecture",
+            "class",
+            "productivity",
+            "productive",
+            "time management",
+            "공부",
+            "공부 브이로그",
+            "스터디",
+            "집중",
             "수능",
             "내신",
             "시험",
-            "lecture",
-            "class",
             "강의",
             "인강",
-            "공부법",
-            "productivity",
-            "productive",
-            "time management"
+            "공부법"
         ],
         exclude: [
             "game",
             "gaming",
             "minecraft",
-            "롤",
-            "발로란트",
-            "배틀그라운드",
-            "먹방",
+            "roblox",
+            "battleground",
             "mukbang",
-            "아이돌",
             "reaction",
             "prank",
-            "예능",
             "shorts",
+            "challenge",
+            "게임",
+            "로블록스",
+            "배틀그라운드",
+            "먹방",
+            "아이돌",
+            "예능",
             "챌린지",
-            "몰카",
-            "classic"
+            "몰카"
         ]
     },
     workout: {
@@ -64,21 +111,25 @@ const PACKAGE_CONFIG = {
             "workout",
             "fitness",
             "exercise",
+            "home workout",
+            "bodybuilding",
+            "muscle",
             "운동",
             "헬스",
             "루틴",
-            "피트니스",
-            "home workout",
-            "bodybuilding",
-            "muscle"
+            "스트레칭",
+            "홈트",
+            "근육"
         ],
         exclude: [
             "game",
             "gaming",
-            "먹방",
-            "예능",
+            "mukbang",
             "shorts",
-            "reaction"
+            "reaction",
+            "게임",
+            "먹방",
+            "예능"
         ]
     },
     development: {
@@ -92,6 +143,8 @@ const PACKAGE_CONFIG = {
             "typescript",
             "node",
             "python",
+            "project",
+            "tutorial",
             "개발",
             "프로그래밍",
             "코딩",
@@ -102,10 +155,12 @@ const PACKAGE_CONFIG = {
         exclude: [
             "game",
             "gaming",
-            "먹방",
-            "예능",
+            "mukbang",
             "shorts",
-            "reaction"
+            "reaction",
+            "게임",
+            "먹방",
+            "예능"
         ]
     },
     reading: {
@@ -114,26 +169,28 @@ const PACKAGE_CONFIG = {
             "reading",
             "book",
             "books",
+            "learning",
+            "essay",
             "독서",
             "책",
             "지식",
-            "self development",
             "자기계발",
-            "learning",
-            "essay"
+            "서평"
         ],
         exclude: [
             "game",
             "gaming",
-            "먹방",
-            "예능",
+            "mukbang",
             "shorts",
-            "reaction"
+            "reaction",
+            "게임",
+            "먹방",
+            "예능"
         ]
     }
 };
 
-const DEFAULT_PACKAGE = "study";
+const DEFAULT_PACKAGE = "kids";
 const PACKAGE_NAMES = Object.keys(PACKAGE_CONFIG);
 
 if (typeof window !== "undefined") {

@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="popup.css" />
     <style>
       body {
-        width: 360px;
+        width: 380px;
       }
 
       .keyword-row {
@@ -28,7 +28,7 @@
       }
 
       .keyword-list {
-        max-height: 220px;
+        max-height: 240px;
         overflow-y: auto;
       }
 
@@ -45,12 +45,12 @@
   <body>
     <div class="container">
       <h1>키워드 관리</h1>
-      <p>현재 패키지의 키워드를 추가하거나 삭제하세요.</p>
-      <div id="currentPackageLabel" class="current-package">현재 패키지: study</div>
+      <p class="small">현재 패키지에 적합/부적합 키워드를 추가하거나 제거하세요.</p>
+      <div id="currentPackageLabel" class="current-package">현재 패키지: kids</div>
 
       <div class="panel">
         <h2>키워드 추가</h2>
-        <input id="keywordInput" type="text" placeholder="예: 집중, coding" />
+        <input id="keywordInput" type="text" placeholder="예: 폭력, 과학, coding" />
         <select id="keywordType">
           <option value="include">적합 키워드</option>
           <option value="exclude">부적합 키워드</option>

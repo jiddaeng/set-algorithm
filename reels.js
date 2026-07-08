@@ -5,21 +5,30 @@ let reelsAlive = true;
 let reelsTimer = null;
 let pendingReelReprocess = false;
 
-function safeGetSelectedPackage() {
+function safeGetReelFilterState() {
     if (!reelsAlive) {
-        return Promise.resolve(DEFAULT_PACKAGE);
+        return Promise.resolve({
+            packageName: DEFAULT_PACKAGE,
+            filterMode: "purpose"
+        });
     }
 
     try {
         if (typeof chrome !== "undefined" && chrome.storage?.local) {
             return new Promise(resolve => {
-                chrome.storage.local.get(["selectedPackage"], result => {
+                chrome.storage.local.get(["selectedPackage", "filterMode"], result => {
                     if (!reelsAlive) {
-                        resolve(DEFAULT_PACKAGE);
+                        resolve({
+                            packageName: DEFAULT_PACKAGE,
+                            filterMode: "purpose"
+                        });
                         return;
                     }
-                    console.log("[Set Algorithm] reels loaded storage", result);
-                    resolve(result.selectedPackage || DEFAULT_PACKAGE);
+
+                    resolve({
+                        packageName: result.selectedPackage || DEFAULT_PACKAGE,
+                        filterMode: normalizeFilterMode(result.filterMode || "purpose")
+                    });
                 });
             });
         }
@@ -28,7 +37,10 @@ function safeGetSelectedPackage() {
         console.warn("Reels storage access failed:", error);
     }
 
-    return Promise.resolve(DEFAULT_PACKAGE);
+    return Promise.resolve({
+        packageName: DEFAULT_PACKAGE,
+        filterMode: "purpose"
+    });
 }
 
 function collectReelText(element) {
@@ -51,6 +63,10 @@ function collectReelText(element) {
 }
 
 function getReelCandidates() {
+    if (!location.hostname.includes("instagram.com")) {
+        return [];
+    }
+
     const candidates = new Set();
 
     document.querySelectorAll('a[href*="/reel/"]').forEach(link => {
@@ -112,7 +128,7 @@ function skipCurrentReel() {
 }
 
 async function runInstagramReelsFilter() {
-    if (!reelsAlive) {
+    if (!location.hostname.includes("instagram.com") || !reelsAlive) {
         return;
     }
 
@@ -124,7 +140,8 @@ async function runInstagramReelsFilter() {
     reelsProcessing = true;
 
     try {
-        const packageName = await safeGetSelectedPackage();
+        const { packageName, filterMode } = await safeGetReelFilterState();
+        const config = await getPackageConfigAsync(packageName);
 
         if (packageName !== lastReelPackage || window.location.href !== lastReelUrl) {
             lastReelPackage = packageName;
@@ -136,9 +153,9 @@ async function runInstagramReelsFilter() {
 
         candidates.forEach(candidate => {
             const text = collectReelText(candidate);
-            const score = calculateScore(text, packageName);
+            const shouldKeep = shouldKeepContent(text, packageName, config, filterMode);
 
-            if (score <= 0) {
+            if (!shouldKeep) {
                 hideReelCard(candidate);
                 hiddenCount += 1;
             }
@@ -147,14 +164,14 @@ async function runInstagramReelsFilter() {
         const isReelPage = window.location.pathname.includes("/reel/");
         if (isReelPage) {
             const currentText = collectReelText(document.body);
-            const score = calculateScore(currentText, packageName);
-            if (score <= 0) {
+            const shouldKeep = shouldKeepContent(currentText, packageName, config, filterMode);
+            if (!shouldKeep) {
                 skipCurrentReel();
             }
         }
 
         if (hiddenCount > 0 || isReelPage) {
-            console.log(`[Set Algorithm - Reels] ${packageName}: ${hiddenCount}개 카드 숨김`);
+            console.log(`[Set Algorithm - Reels] ${packageName}/${filterMode}: hidden ${hiddenCount}`);
         }
     } catch (error) {
         reelsAlive = false;
@@ -173,6 +190,14 @@ createObserver(runInstagramReelsFilter);
 window.addEventListener("load", runInstagramReelsFilter);
 window.addEventListener("popstate", runInstagramReelsFilter);
 
+if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName === "local" && (changes.selectedPackage || changes.customKeywords || changes.filterMode)) {
+            runInstagramReelsFilter();
+        }
+    });
+}
+
 if (reelsTimer) {
     clearInterval(reelsTimer);
 }
@@ -185,4 +210,4 @@ window.addEventListener("beforeunload", () => {
     }
 });
 
-console.log("Set Algorithm Reels 실행됨");
+console.log("Set Algorithm Reels filter loaded");

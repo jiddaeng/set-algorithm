@@ -1,0 +1,295 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f5f7fb;
+  color: #182033;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f5f7fb;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 6px;
+  background: #1d4ed8;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 10px 14px;
+}
+
+button.secondary {
+  background: #e8edf8;
+  color: #1f2a44;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+input,
+select {
+  width: 100%;
+  border: 1px solid #c9d3e5;
+  border-radius: 6px;
+  background: #fff;
+  color: #182033;
+  padding: 10px 12px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: #44506a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.shell {
+  width: min(1120px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 24px 0 40px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+h2 {
+  font-size: 18px;
+}
+
+h3 {
+  font-size: 15px;
+}
+
+.topbar p,
+.panel-heading p {
+  color: #66728a;
+  margin-top: 6px;
+}
+
+.status {
+  border-radius: 999px;
+  background: #e8edf8;
+  color: #34415c;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.status.ok {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.control-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(280px, 1.15fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.panel {
+  border: 1px solid #dbe3f1;
+  border-radius: 8px;
+  background: #fff;
+  padding: 16px;
+}
+
+.device-panel,
+.stats-panel {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.button-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.device-list {
+  display: grid;
+  gap: 8px;
+}
+
+.device-button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid #dbe3f1;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #1f2a44;
+  font-weight: 700;
+  padding: 10px;
+  text-align: left;
+}
+
+.device-button.active {
+  border-color: #1d4ed8;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.meta-list {
+  display: grid;
+  gap: 6px;
+  color: #44506a;
+  font-size: 14px;
+}
+
+.stats-box {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.stat {
+  border-radius: 6px;
+  background: #f1f5fb;
+  padding: 10px;
+}
+
+.stat strong {
+  display: block;
+  color: #1f2a44;
+  font-size: 22px;
+}
+
+.stat span {
+  color: #66728a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.policy-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.panel-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.keyword-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.keyword-column {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.keyword-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.keyword-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 42px;
+  border: 1px dashed #c9d3e5;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #27346a;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 8px 6px 10px;
+}
+
+.chip button {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #dbe3ff;
+  color: #27346a;
+  line-height: 1;
+  padding: 0;
+}
+
+.empty {
+  color: #7b879d;
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .shell {
+    width: min(100vw - 20px, 680px);
+    padding-top: 14px;
+  }
+
+  .topbar,
+  .panel-heading {
+    display: grid;
+  }
+
+  .control-grid,
+  .form-grid,
+  .keyword-columns,
+  .stats-box {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "set-algorithm-remote-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remote control dashboard and API for the Set Algorithm Chrome extension.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js"
+  }
+}
