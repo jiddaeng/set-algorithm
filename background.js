@@ -135,6 +135,20 @@ function sanitizePolicy(policy) {
     };
 }
 
+async function acknowledgePolicy(settings, policy) {
+    const response = await fetch(buildDeviceUrl(settings, "/ack"), {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ revision: policy.revision })
+    });
+
+    if (!response.ok) {
+        throw new Error(`Policy acknowledgement failed with ${response.status}`);
+    }
+}
+
 function hasSamePolicyValue(value, expected) {
     return JSON.stringify(value) === JSON.stringify(expected);
 }
@@ -250,6 +264,7 @@ async function runRemotePolicySync(reason = "alarm") {
         });
 
         await notifySupportedTabs();
+        await acknowledgePolicy(settings, policy);
         return syncStatus;
     } catch (error) {
         const syncStatus = {

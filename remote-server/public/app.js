@@ -31,6 +31,7 @@ const FILTER_MODE_LABELS = {
 
 let currentDeviceId = "";
 let currentPolicy = null;
+let waitingForChildRevision = null;
 let currentKeywords = {
   include: [],
   exclude: []
@@ -102,8 +103,10 @@ function renderMeta(policy) {
     ["기기 ID", policy.deviceId],
     ["패키지", PACKAGE_LABELS[policy.selectedPackage] || policy.selectedPackage],
     ["모드", FILTER_MODE_LABELS[policy.filterMode] || policy.filterMode],
+    ["정책 버전", policy.revision || 1],
     ["마지막 정책 수정", policy.updatedAt || "-"],
-    ["마지막 확장 접속", policy.lastSeenAt || "-"]
+    ["마지막 확장 접속", policy.lastSeenAt || "-"],
+    ["자녀 동기화", policy.lastAppliedAt ? `${policy.lastAppliedAt} (v${policy.lastAppliedRevision || 1})` : "대기 중"]
   ];
 
   rows.forEach(([label, value]) => {
@@ -189,6 +192,32 @@ function renderPolicy(policy) {
   renderKeywordList(includeKeywordList, currentKeywords.include, "include");
   renderKeywordList(excludeKeywordList, currentKeywords.exclude, "exclude");
   highlightActiveDevice();
+
+  if (waitingForChildRevision && Number(policy.lastAppliedRevision || 0) >= waitingForChildRevision) {
+    waitingForChildRevision = null;
+    setStatus("자녀 기기에 정책 동기화가 완료되었습니다.", "ok");
+  }
+}
+
+function delay(milliseconds) {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
+async function waitForChildPolicyApplication(deviceId, revision) {
+  for (let attempt = 0; attempt < 15 && waitingForChildRevision === revision; attempt += 1) {
+    await delay(2000);
+    const policy = await api(`/api/devices/${encodeURIComponent(deviceId)}/policy`);
+    renderPolicy(policy);
+
+    if (Number(policy.lastAppliedRevision || 0) >= revision) {
+      return;
+    }
+  }
+
+  if (waitingForChildRevision === revision) {
+    waitingForChildRevision = null;
+    setStatus("자녀 기기 동기화 확인을 기다리는 중입니다.", "error");
+  }
 }
 
 async function loadDevice(deviceId) {
@@ -286,7 +315,9 @@ async function savePolicy() {
     });
     renderPolicy(savedPolicy);
     await refreshDevices();
-    setStatus("저장됨", "ok");
+    waitingForChildRevision = Number(savedPolicy.revision || 1);
+    setStatus("저장됨. 자녀 기기 동기화를 기다리는 중입니다.", "ok");
+    waitForChildPolicyApplication(savedPolicy.deviceId, waitingForChildRevision).catch(showError);
   } catch (error) {
     if (error.status === 409 && error.policy) {
       renderPolicy(error.policy);

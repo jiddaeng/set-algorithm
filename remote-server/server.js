@@ -29,6 +29,8 @@ function createDefaultPolicy(deviceId) {
     deviceId,
     revision: 1,
     updatedBy: "parent",
+    lastAppliedRevision: 0,
+    lastAppliedAt: null,
     selectedPackage: "kids",
     filterMode: "blocklist",
     customKeywords: {
@@ -226,6 +228,8 @@ async function handleApi(request, response, requestUrl) {
       revision: getPolicyRevision(policy),
       updatedAt: policy.updatedAt,
       lastSeenAt: policy.lastSeenAt || null,
+      lastAppliedRevision: Number(policy.lastAppliedRevision || 0),
+      lastAppliedAt: policy.lastAppliedAt || null,
       stats: policy.stats || null
     }));
     sendJson(response, 200, { devices });
@@ -280,6 +284,30 @@ async function handleApi(request, response, requestUrl) {
     store.devices[deviceRoute.deviceId] = sanitizePolicyPatch(payload, policy);
     await saveStore(store);
     sendJson(response, 200, store.devices[deviceRoute.deviceId]);
+    return;
+  }
+
+  if (deviceRoute.action === "ack" && request.method === "POST") {
+    const payload = await readRequestJson(request);
+    const acknowledgedRevision = Number(payload.revision);
+    const currentRevision = getPolicyRevision(policy);
+
+    if (!Number.isInteger(acknowledgedRevision) || acknowledgedRevision !== currentRevision) {
+      sendJson(response, 409, {
+        error: "Acknowledgement does not match the current policy.",
+        revision: currentRevision
+      });
+      return;
+    }
+
+    store.devices[deviceRoute.deviceId] = {
+      ...policy,
+      lastAppliedRevision: acknowledgedRevision,
+      lastAppliedAt: now(),
+      lastSeenAt: now()
+    };
+    await saveStore(store);
+    sendJson(response, 200, { ok: true, revision: acknowledgedRevision });
     return;
   }
 
