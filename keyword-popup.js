@@ -3,8 +3,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const keywordType = document.getElementById("keywordType");
   const addKeywordButton = document.getElementById("addKeywordButton");
   const keywordList = document.getElementById("keywordList");
+  const currentPackageLabel = document.getElementById("currentPackageLabel");
 
-  let currentPackageName = "study";
+  let currentPackageName = DEFAULT_PACKAGE || "kids";
   let currentKeywords = { include: [], exclude: [] };
 
   function safeStorageGet(keys, fallback = {}) {
@@ -83,37 +84,74 @@ document.addEventListener("DOMContentLoaded", () => {
     return nextMap;
   }
 
+  function renderPackageInfo() {
+    if (!currentPackageLabel) {
+      return;
+    }
+
+    const label = PACKAGE_CONFIG[currentPackageName]?.label || currentPackageName;
+    currentPackageLabel.textContent = `현재 패키지: ${label}`;
+  }
+
+  function createKeywordRow(keyword, type) {
+    const row = document.createElement("div");
+    row.className = "keyword-row";
+
+    const label = document.createElement("span");
+    label.textContent = `${type === "include" ? "허용" : "차단"}: ${keyword}`;
+
+    const actions = document.createElement("span");
+    actions.className = "keyword-actions";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.type = type;
+    button.dataset.keyword = keyword;
+    button.textContent = "삭제";
+
+    actions.appendChild(button);
+    row.append(label, actions);
+    return row;
+  }
+
   function renderKeywords() {
     if (!keywordList) {
       return;
     }
 
-    const includeItems = (currentKeywords.include || []).map(keyword => `
-      <div class="keyword-row">
-        <span>✅ ${keyword}</span>
-        <span class="keyword-actions">
-          <button data-type="include" data-keyword="${keyword}">삭제</button>
-        </span>
-      </div>
-    `).join("");
+    keywordList.textContent = "";
 
-    const excludeItems = (currentKeywords.exclude || []).map(keyword => `
-      <div class="keyword-row">
-        <span>🚫 ${keyword}</span>
-        <span class="keyword-actions">
-          <button data-type="exclude" data-keyword="${keyword}">삭제</button>
-        </span>
-      </div>
-    `).join("");
+    const rows = [
+      ...(currentKeywords.include || []).map(keyword => createKeywordRow(keyword, "include")),
+      ...(currentKeywords.exclude || []).map(keyword => createKeywordRow(keyword, "exclude"))
+    ];
 
-    keywordList.innerHTML = `${includeItems}${excludeItems || "<div class=\"small\">아직 등록된 키워드가 없습니다.</div>"}`;
+    if (!rows.length) {
+      const empty = document.createElement("div");
+      empty.className = "small";
+      empty.textContent = "아직 등록된 키워드가 없습니다.";
+      keywordList.appendChild(empty);
+      return;
+    }
+
+    rows.forEach(row => keywordList.appendChild(row));
   }
 
   function loadKeywordState() {
     safeStorageGet(["selectedPackage", "customKeywords"]).then(result => {
-      currentPackageName = result.selectedPackage || "study";
+      currentPackageName = result.selectedPackage || DEFAULT_PACKAGE || "kids";
       currentKeywords = normalizeKeywordsForPackage(result.customKeywords, currentPackageName);
+      renderPackageInfo();
       renderKeywords();
+    });
+  }
+
+  function saveKeywords(nextKeywords) {
+    return safeStorageGet(["customKeywords"]).then(result => {
+      const nextStorageKeywords = buildStoredKeywordsMap(result.customKeywords, currentPackageName, nextKeywords);
+      currentKeywords = nextKeywords;
+      renderKeywords();
+      return safeStorageSet({ customKeywords: nextStorageKeywords });
     });
   }
 
@@ -125,27 +163,25 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    safeStorageGet(["customKeywords"]).then(result => {
-      const storedKeywords = normalizeKeywordsForPackage(result.customKeywords, currentPackageName);
-      const nextKeywords = {
-        include: [...(storedKeywords.include || [])],
-        exclude: [...(storedKeywords.exclude || [])]
-      };
+    const nextKeywords = {
+      include: [...(currentKeywords.include || [])],
+      exclude: [...(currentKeywords.exclude || [])]
+    };
 
-      const targetList = nextKeywords[type] || [];
-      if (!targetList.includes(keyword)) {
-        targetList.push(keyword);
-      }
-      nextKeywords[type] = targetList;
+    if (!nextKeywords[type].includes(keyword)) {
+      nextKeywords[type].push(keyword);
+    }
 
-      currentKeywords = nextKeywords;
-      renderKeywords();
-
-      const nextStorageKeywords = buildStoredKeywordsMap(result.customKeywords, currentPackageName, nextKeywords);
-      safeStorageSet({ customKeywords: nextStorageKeywords }).then(() => {
-        keywordInput.value = "";
-      });
+    saveKeywords(nextKeywords).then(() => {
+      keywordInput.value = "";
+      keywordInput.focus();
     });
+  });
+
+  keywordInput?.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      addKeywordButton?.click();
+    }
   });
 
   keywordList?.addEventListener("click", event => {
@@ -156,28 +192,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const keyword = button.getAttribute("data-keyword");
     const type = button.getAttribute("data-type") || "include";
+    const nextKeywords = {
+      include: [...(currentKeywords.include || [])],
+      exclude: [...(currentKeywords.exclude || [])]
+    };
 
-    safeStorageGet(["customKeywords"]).then(result => {
-      const storedKeywords = normalizeKeywordsForPackage(result.customKeywords, currentPackageName);
-      const nextKeywords = {
-        include: [...(storedKeywords.include || [])],
-        exclude: [...(storedKeywords.exclude || [])]
-      };
+    nextKeywords[type] = (nextKeywords[type] || []).filter(item => item !== keyword);
+    saveKeywords(nextKeywords);
+  });
 
-      nextKeywords[type] = (nextKeywords[type] || []).filter(item => item !== keyword);
-      currentKeywords = nextKeywords;
-      renderKeywords();
-
-      const nextStorageKeywords = buildStoredKeywordsMap(result.customKeywords, currentPackageName, nextKeywords);
-      safeStorageSet({ customKeywords: nextStorageKeywords });
+  if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName === "local" && (changes.customKeywords || changes.selectedPackage)) {
+        loadKeywordState();
+      }
     });
-  });
-
-  chrome.storage?.onChanged?.addListener((changes, areaName) => {
-    if (areaName === "local" && (changes.customKeywords || changes.selectedPackage)) {
-      loadKeywordState();
-    }
-  });
+  }
 
   loadKeywordState();
 });

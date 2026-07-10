@@ -1,16 +1,26 @@
 const packageModule = typeof require === "function" ? require("./packages.js") : null;
 const PACKAGE_CONFIG_LOCAL = typeof PACKAGE_CONFIG !== "undefined" ? PACKAGE_CONFIG : (packageModule && packageModule.PACKAGE_CONFIG) || {};
 const DEFAULT_PACKAGE_LOCAL = typeof DEFAULT_PACKAGE !== "undefined" ? DEFAULT_PACKAGE : (packageModule && packageModule.DEFAULT_PACKAGE) || "study";
+const FILTER_MODES = ["purpose", "blocklist", "allowlist"];
 
 function normalizeText(text) {
     return String(text || "").toLowerCase();
 }
 
 function resolvePackageName(packageName) {
-    const normalized = normalizeText(packageName).replace(/[^a-z]/g, "");
+    const rawName = String(packageName || "").trim();
+    const normalized = normalizeText(rawName).replace(/[^a-z]/g, "");
+
+    if (PACKAGE_CONFIG_LOCAL[rawName]) {
+        return rawName;
+    }
 
     if (normalized === "studypack" || normalized === "study") {
         return "study";
+    }
+
+    if (normalized === "kidssafepack" || normalized === "kidspack" || normalized === "kids" || normalized === "child" || normalized === "children") {
+        return "kids";
     }
 
     if (normalized === "workoutpack" || normalized === "workout" || normalized === "fitness") {
@@ -23,6 +33,10 @@ function resolvePackageName(packageName) {
 
     if (normalized === "readingpack" || normalized === "reading" || normalized === "book") {
         return "reading";
+    }
+
+    if (PACKAGE_CONFIG_LOCAL[normalized]) {
+        return normalized;
     }
 
     return DEFAULT_PACKAGE_LOCAL;
@@ -98,9 +112,46 @@ function calculateScore(title, packageName = DEFAULT_PACKAGE_LOCAL, configOverri
     return score;
 }
 
+function normalizeFilterMode(filterMode) {
+    return FILTER_MODES.includes(filterMode) ? filterMode : "purpose";
+}
+
+function hasKeywordMatch(text, keywords = []) {
+    const normalizedText = normalizeText(text);
+    return (keywords || []).some(keyword => {
+        const normalizedKeyword = normalizeText(keyword).trim();
+        return normalizedKeyword && normalizedText.includes(normalizedKeyword);
+    });
+}
+
+function shouldKeepContent(text, packageName = DEFAULT_PACKAGE_LOCAL, configOverride = null, filterMode = "purpose") {
+    const config = configOverride || getPackageConfig(packageName);
+    const mode = normalizeFilterMode(filterMode);
+    const include = config.include || [];
+    const exclude = config.exclude || [];
+    const hasInclude = hasKeywordMatch(text, include);
+    const hasExclude = hasKeywordMatch(text, exclude);
+
+    if (hasExclude) {
+        return false;
+    }
+
+    if (mode === "blocklist") {
+        return true;
+    }
+
+    if (mode === "allowlist") {
+        return include.length === 0 || hasInclude;
+    }
+
+    return calculateScore(text, packageName, config) > 0;
+}
+
 if (typeof window !== "undefined") {
     window.calculateScore = calculateScore;
     window.getPackageConfig = getPackageConfig;
+    window.normalizeFilterMode = normalizeFilterMode;
+    window.shouldKeepContent = shouldKeepContent;
 }
 
 if (typeof module !== "undefined") {
@@ -108,7 +159,10 @@ if (typeof module !== "undefined") {
         calculateScore,
         getPackageConfig,
         getPackageConfigAsync,
+        hasKeywordMatch,
         normalizeCustomKeywordsForPackage,
-        resolvePackageName
+        normalizeFilterMode,
+        resolvePackageName,
+        shouldKeepContent
     };
 }

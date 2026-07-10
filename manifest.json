@@ -4,13 +4,21 @@
   "version": "1.0",
 
   "permissions": [
-    "storage"
+    "storage",
+    "alarms",
+    "tabs"
   ],
 
   "host_permissions": [
+    "http://*/*",
+    "https://*/*",
     "https://www.youtube.com/*",
     "https://www.instagram.com/*"
   ],
+
+  "background": {
+    "service_worker": "background.js"
+  },
 
   "content_scripts": [
     {
