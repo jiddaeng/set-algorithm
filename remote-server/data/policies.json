@@ -82,14 +82,14 @@
         "removed": 971,
         "packageName": "development",
         "filterMode": "allowlist",
-        "updatedAt": "2026-07-10T12:22:01.974Z",
-        "uploadedAt": "2026-07-10T12:22:01.976Z"
+        "updatedAt": "2026-07-10T12:33:01.933Z",
+        "uploadedAt": "2026-07-10T12:33:01.935Z"
       },
       "createdAt": "2026-07-10T12:06:01.782Z",
       "updatedAt": "2026-07-10T12:13:19.519Z",
       "extensionVersion": "1.0",
       "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
-      "lastSeenAt": "2026-07-10T12:22:10.271Z"
+      "lastSeenAt": "2026-07-10T12:33:10.265Z"
     }
   }
 }
