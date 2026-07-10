@@ -27,6 +27,8 @@ function now() {
 function createDefaultPolicy(deviceId) {
   return {
     deviceId,
+    revision: 1,
+    updatedBy: "parent",
     selectedPackage: "kids",
     filterMode: "blocklist",
     customKeywords: {
@@ -39,6 +41,11 @@ function createDefaultPolicy(deviceId) {
     createdAt: now(),
     updatedAt: now()
   };
+}
+
+function getPolicyRevision(policy) {
+  const revision = Number(policy?.revision);
+  return Number.isInteger(revision) && revision > 0 ? revision : 1;
 }
 
 async function ensureDataDir() {
@@ -128,6 +135,8 @@ function sanitizePolicyPatch(payload, currentPolicy) {
 
   return {
     ...currentPolicy,
+    revision: getPolicyRevision(currentPolicy) + 1,
+    updatedBy: "parent",
     selectedPackage,
     filterMode,
     customKeywords: sanitizeKeywordsMap(payload.customKeywords),
@@ -214,6 +223,7 @@ async function handleApi(request, response, requestUrl) {
       deviceId: policy.deviceId,
       selectedPackage: policy.selectedPackage,
       filterMode: policy.filterMode,
+      revision: getPolicyRevision(policy),
       updatedAt: policy.updatedAt,
       lastSeenAt: policy.lastSeenAt || null,
       stats: policy.stats || null
@@ -253,6 +263,20 @@ async function handleApi(request, response, requestUrl) {
 
   if (deviceRoute.action === "policy" && request.method === "PUT") {
     const payload = await readRequestJson(request);
+    const requestedRevision = Number(payload.baseRevision);
+    const currentRevision = getPolicyRevision(policy);
+
+    if (!Number.isInteger(requestedRevision) || requestedRevision !== currentRevision) {
+      sendJson(response, 409, {
+        error: "Policy changed by the parent dashboard. Reload before saving again.",
+        policy: {
+          ...policy,
+          revision: currentRevision
+        }
+      });
+      return;
+    }
+
     store.devices[deviceRoute.deviceId] = sanitizePolicyPatch(payload, policy);
     await saveStore(store);
     sendJson(response, 200, store.devices[deviceRoute.deviceId]);

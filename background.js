@@ -130,8 +130,40 @@ function sanitizePolicy(policy) {
         selectedPackage,
         customKeywords: sanitizeKeywordsMap(policy?.customKeywords),
         filterMode: normalizeFilterModeValue(policy?.filterMode),
+        revision: Number.isInteger(Number(policy?.revision)) && Number(policy.revision) > 0 ? Number(policy.revision) : 1,
         policyUpdatedAt: policy?.updatedAt || ""
     };
+}
+
+function hasSamePolicyValue(value, expected) {
+    return JSON.stringify(value) === JSON.stringify(expected);
+}
+
+async function enforceParentPolicy(changes) {
+    if (!changes.selectedPackage && !changes.customKeywords && !changes.filterMode) {
+        return;
+    }
+
+    const result = await storageGet(["remoteSettings", "parentPolicy"]);
+    const settings = normalizeRemoteSettings(result.remoteSettings || {});
+    const policy = result.parentPolicy;
+
+    if (!settings.enabled || !policy) {
+        return;
+    }
+
+    const parentValues = {
+        selectedPackage: policy.selectedPackage,
+        customKeywords: policy.customKeywords,
+        filterMode: policy.filterMode
+    };
+    const hasConflict = Object.entries(parentValues).some(([key, value]) =>
+        changes[key] && !hasSamePolicyValue(changes[key].newValue, value)
+    );
+
+    if (hasConflict) {
+        await storageSet(parentValues);
+    }
 }
 
 async function notifySupportedTabs() {
@@ -213,6 +245,7 @@ async function runRemotePolicySync(reason = "alarm") {
             selectedPackage: policy.selectedPackage,
             customKeywords: policy.customKeywords,
             filterMode: policy.filterMode,
+            parentPolicy: policy,
             remoteSyncStatus: syncStatus
         });
 
@@ -322,6 +355,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === "local") {
+        enforceParentPolicy(changes).catch(error => {
+            console.warn("Parent policy enforcement failed:", error);
+        });
+    }
+
     if (areaName === "local" && changes.filterStats?.newValue) {
         uploadStats(changes.filterStats.newValue);
     }

@@ -56,8 +56,11 @@ async function api(path, options = {}) {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.error || `요청 실패: ${response.status}`);
+    const payload = await response.json().catch(() => ({}));
+    const error = new Error(payload.error || `요청 실패: ${response.status}`);
+    error.status = response.status;
+    error.policy = payload.policy || null;
+    throw error;
   }
 
   return response.json();
@@ -271,17 +274,28 @@ async function savePolicy() {
   const nextPolicy = setPolicyKeywords({
     ...currentPolicy,
     selectedPackage: packageName,
-    filterMode: filterModeSelect.value || "blocklist"
+    filterMode: filterModeSelect.value || "blocklist",
+    baseRevision: Number(currentPolicy.revision || 1)
   }, packageName, currentKeywords);
 
-  setStatus("저장 중");
-  const savedPolicy = await api(`/api/devices/${encodeURIComponent(currentDeviceId)}/policy`, {
-    method: "PUT",
-    body: JSON.stringify(nextPolicy)
-  });
-  renderPolicy(savedPolicy);
-  await refreshDevices();
-  setStatus("저장됨", "ok");
+  try {
+    setStatus("저장 중");
+    const savedPolicy = await api(`/api/devices/${encodeURIComponent(currentDeviceId)}/policy`, {
+      method: "PUT",
+      body: JSON.stringify(nextPolicy)
+    });
+    renderPolicy(savedPolicy);
+    await refreshDevices();
+    setStatus("저장됨", "ok");
+  } catch (error) {
+    if (error.status === 409 && error.policy) {
+      renderPolicy(error.policy);
+      await refreshDevices();
+      setStatus("다른 부모 정책이 먼저 저장되어 최신 상태를 불러왔습니다.", "error");
+      return;
+    }
+    throw error;
+  }
 }
 
 function showError(error) {
