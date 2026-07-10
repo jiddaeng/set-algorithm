@@ -1,4 +1,5 @@
 const REMOTE_SYNC_ALARM = "setAlgorithmRemoteSync";
+let inFlightRemoteSync = null;
 const DEFAULT_REMOTE_SETTINGS = {
     enabled: true,
     serverUrl: "http://localhost:3000",
@@ -156,7 +157,19 @@ async function notifySupportedTabs() {
     });
 }
 
-async function syncRemotePolicy(reason = "alarm") {
+function syncRemotePolicy(reason = "alarm") {
+    if (inFlightRemoteSync) {
+        return inFlightRemoteSync;
+    }
+
+    inFlightRemoteSync = runRemotePolicySync(reason).finally(() => {
+        inFlightRemoteSync = null;
+    });
+
+    return inFlightRemoteSync;
+}
+
+async function runRemotePolicySync(reason = "alarm") {
     const settings = await ensureRemoteSettings();
 
     if (!settings.enabled) {
@@ -277,6 +290,11 @@ chrome.alarms?.onAlarm.addListener(alarm => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message?.type === "SET_ALGORITHM_ACTIVE_SYNC") {
+        syncRemotePolicy("active-tab").then(status => sendResponse({ ok: true, status }));
+        return true;
+    }
+
     if (message?.type === "SET_ALGORITHM_REMOTE_SYNC_NOW") {
         syncRemotePolicy("manual").then(status => sendResponse({ ok: true, status }));
         return true;

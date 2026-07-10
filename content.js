@@ -22,7 +22,9 @@ let lastPackageName = DEFAULT_PACKAGE;
 let contentAlive = true;
 let pendingContentReprocess = false;
 let youtubeFilterTimer = null;
+let activeSyncTimer = null;
 const YOUTUBE_IDLE_DELAY = 1200;
+const ACTIVE_SYNC_INTERVAL_MS = 5000;
 
 function safeStorageGet(keys, fallback = {}) {
     if (!contentAlive || typeof chrome === "undefined" || !chrome.storage?.local) {
@@ -123,6 +125,25 @@ function observeYouTubeVideoLoading() {
 
     scheduleYouTubeFilter();
     return observer;
+}
+
+function requestActiveRemoteSync() {
+    if (window.location.hostname !== "www.youtube.com" || typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
+        return;
+    }
+
+    chrome.runtime.sendMessage({ type: "SET_ALGORITHM_ACTIVE_SYNC" }, () => {
+        chrome.runtime.lastError;
+    });
+}
+
+function startActiveRemoteSync() {
+    if (window.location.hostname !== "www.youtube.com") {
+        return;
+    }
+
+    requestActiveRemoteSync();
+    activeSyncTimer = setInterval(requestActiveRemoteSync, ACTIVE_SYNC_INTERVAL_MS);
 }
 
 function extractVideoText(video) {
@@ -243,11 +264,13 @@ async function runSetAlgorithm() {
 }
 
 observeYouTubeVideoLoading();
+startActiveRemoteSync();
 window.addEventListener("load", () => scheduleYouTubeFilter());
 window.addEventListener("yt-navigate-finish", () => scheduleYouTubeFilter());
 window.addEventListener("beforeunload", () => {
     contentAlive = false;
     clearTimeout(youtubeFilterTimer);
+    clearInterval(activeSyncTimer);
 });
 
 if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
