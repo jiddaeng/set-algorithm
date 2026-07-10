@@ -19,8 +19,25 @@ function storageSet(data) {
 }
 
 function normalizeServerUrl(serverUrl) {
-    const value = String(serverUrl || DEFAULT_REMOTE_SETTINGS.serverUrl).trim();
-    return value.replace(/\/+$/, "") || DEFAULT_REMOTE_SETTINGS.serverUrl;
+    let value = String(serverUrl || DEFAULT_REMOTE_SETTINGS.serverUrl).trim();
+    if (!value) {
+        return DEFAULT_REMOTE_SETTINGS.serverUrl;
+    }
+
+    if (!/^https?:\/\//i.test(value)) {
+        const isLocalAddress = /^(localhost|127\.0\.0\.1|\[::1\]|10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/i.test(value);
+        value = `${isLocalAddress ? "http" : "https"}://${value}`;
+    }
+
+    try {
+        const url = new URL(value);
+        if (!["http:", "https:"].includes(url.protocol)) {
+            return DEFAULT_REMOTE_SETTINGS.serverUrl;
+        }
+        return url.href.replace(/\/+$/, "");
+    } catch (error) {
+        return DEFAULT_REMOTE_SETTINGS.serverUrl;
+    }
 }
 
 function generateDeviceId() {
