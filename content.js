@@ -7,10 +7,14 @@ const YOUTUBE_VIDEO_SELECTOR = [
     "ytd-rich-grid-media",
     "ytd-video-renderer",
     "ytd-compact-video-renderer",
+    "ytd-compact-movie-renderer",
+    "ytd-compact-playlist-renderer",
     "ytd-grid-video-renderer",
     "ytd-reel-item-renderer",
+    "ytd-reel-video-renderer",
     "ytd-playlist-renderer",
-    "ytd-radio-renderer"
+    "ytd-radio-renderer",
+    "yt-lockup-view-model"
 ].join(", ");
 
 let isProcessing = false;
@@ -65,24 +69,33 @@ function getVideoCandidates() {
 }
 
 function readTextOrAttribute(element, selector, attribute = null) {
-    const target = element.querySelector(selector);
-    if (!target) {
-        return "";
-    }
+    return Array.from(element.querySelectorAll(selector))
+        .map(target => {
+            if (attribute) {
+                return target.getAttribute(attribute) || "";
+            }
 
-    if (attribute) {
-        return target.getAttribute(attribute) || "";
-    }
-
-    return target.innerText || target.textContent || "";
+            return target.innerText || target.textContent || "";
+        })
+        .filter(Boolean)
+        .join("\n");
 }
 
 function extractVideoText(video) {
     const parts = [
         video.getAttribute("aria-label") || "",
         video.getAttribute("title") || "",
+        video.getAttribute("data-title") || "",
         readTextOrAttribute(video, "#video-title", "title"),
         readTextOrAttribute(video, "#video-title"),
+        readTextOrAttribute(video, "a#video-title-link", "title"),
+        readTextOrAttribute(video, "a#video-title-link"),
+        readTextOrAttribute(video, 'a[href*="/watch"]', "aria-label"),
+        readTextOrAttribute(video, 'a[href*="/watch"]', "title"),
+        readTextOrAttribute(video, 'a[href*="/shorts/"]', "aria-label"),
+        readTextOrAttribute(video, 'a[href*="/shorts/"]', "title"),
+        readTextOrAttribute(video, "yt-formatted-string#video-title"),
+        readTextOrAttribute(video, ".yt-core-attributed-string"),
         readTextOrAttribute(video, "h3"),
         readTextOrAttribute(video, "h4"),
         readTextOrAttribute(video, "#metadata"),

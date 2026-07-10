@@ -93,9 +93,15 @@ h3 {
 }
 
 .topbar p,
-.panel-heading p {
+.panel-heading p,
+.hint {
   color: #66728a;
   margin-top: 6px;
+}
+
+.hint {
+  font-size: 13px;
+  margin: 0;
 }
 
 .status {
@@ -258,6 +264,11 @@ h3 {
   font-size: 13px;
   font-weight: 700;
   padding: 6px 8px 6px 10px;
+}
+
+.chip.exclude {
+  background: #fff1f2;
+  color: #9f1239;
 }
 
 .chip button {

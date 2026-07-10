@@ -11,7 +11,7 @@
       <header class="topbar">
         <div>
           <h1>Set Algorithm Remote</h1>
-          <p>확장이 설치된 아이 기기의 유튜브 필터 정책을 원격으로 바꿉니다.</p>
+          <p>부모가 정한 패키지와 키워드를 자녀 기기의 Chrome 확장 프로그램으로 동기화합니다.</p>
         </div>
         <div id="serverStatus" class="status">서버 확인 중</div>
       </header>
@@ -20,20 +20,21 @@
         <div class="panel device-panel">
           <h2>기기 연결</h2>
           <label>
-            <span>기기 ID</span>
+            <span>자녀 기기 ID</span>
             <input id="deviceIdInput" type="text" placeholder="예: kid-12ab34cd" />
           </label>
           <div class="button-row">
             <button id="loadDeviceButton">불러오기</button>
-            <button id="refreshDevicesButton" type="button">목록 새로고침</button>
+            <button id="refreshDevicesButton" class="secondary" type="button">목록 새로고침</button>
           </div>
+          <p class="hint">기기 ID는 자녀 쪽 확장 프로그램 팝업의 원격 제어 영역에 표시됩니다.</p>
           <div id="deviceList" class="device-list"></div>
         </div>
 
         <div class="panel stats-panel">
           <h2>현재 상태</h2>
           <div id="policyMeta" class="meta-list">정책을 불러오세요.</div>
-          <div id="statsBox" class="stats-box">아직 필터 결과가 없습니다.</div>
+          <div id="statsBox" class="stats-box">아직 필터링 결과가 없습니다.</div>
         </div>
       </section>
 
@@ -41,7 +42,7 @@
         <div class="panel-heading">
           <div>
             <h2>필터 정책</h2>
-            <p>저장하면 확장이 다음 동기화 때 자동으로 가져갑니다.</p>
+            <p>저장하면 자녀 기기의 확장 프로그램이 다음 동기화 때 자동으로 가져갑니다.</p>
           </div>
           <button id="savePolicyButton">정책 저장</button>
         </div>
@@ -61,16 +62,16 @@
           <label>
             <span>필터 모드</span>
             <select id="filterModeSelect">
-              <option value="blocklist">부적합 키워드만 숨기기</option>
-              <option value="allowlist">적합 키워드만 남기기</option>
-              <option value="purpose">기존 목적 점수 방식</option>
+              <option value="blocklist">차단 키워드만 숨기기</option>
+              <option value="allowlist">허용 키워드가 있는 영상만 보이기</option>
+              <option value="purpose">패키지 목적 점수로 판단</option>
             </select>
           </label>
         </div>
 
         <div class="keyword-columns">
           <div class="keyword-column">
-            <h3>적합 키워드</h3>
+            <h3>허용 키워드</h3>
             <div class="keyword-input-row">
               <input id="includeKeywordInput" type="text" placeholder="예: 과학, 동화, 교육" />
               <button id="addIncludeButton" type="button">추가</button>
@@ -79,9 +80,9 @@
           </div>
 
           <div class="keyword-column">
-            <h3>부적합 키워드</h3>
+            <h3>차단 키워드</h3>
             <div class="keyword-input-row">
-              <input id="excludeKeywordInput" type="text" placeholder="예: 폭력, 공포, 도박" />
+              <input id="excludeKeywordInput" type="text" placeholder="예: 폭력, 공포, 자극" />
               <button id="addExcludeButton" type="button">추가</button>
             </div>
             <div id="excludeKeywordList" class="keyword-list"></div>

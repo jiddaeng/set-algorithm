@@ -6,7 +6,9 @@ const { URL } = require("node:url");
 const PORT = Number(process.env.PORT || 3000);
 const ROOT_DIR = __dirname;
 const PUBLIC_DIR = path.join(ROOT_DIR, "public");
-const DATA_DIR = path.join(ROOT_DIR, "data");
+const DATA_DIR = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.join(ROOT_DIR, "data");
 const STORE_FILE = path.join(DATA_DIR, "policies.json");
 
 const MIME_TYPES = {
@@ -29,18 +31,7 @@ function createDefaultPolicy(deviceId) {
     customKeywords: {
       kids: {
         include: [],
-        exclude: [
-          "adult",
-          "violence",
-          "horror",
-          "fight",
-          "gambling",
-          "욕설",
-          "폭력",
-          "공포",
-          "도박",
-          "성인"
-        ]
+        exclude: ["adult", "violence", "horror", "fight", "gambling", "선정", "폭력", "공포", "자극", "성인"]
       }
     },
     stats: null,
@@ -73,22 +64,22 @@ async function saveStore(store) {
   await fs.writeFile(STORE_FILE, `${JSON.stringify(store, null, 2)}\n`, "utf-8");
 }
 
-function sendJson(response, statusCode, payload) {
-  response.writeHead(statusCode, {
-    "Content-Type": "application/json; charset=utf-8",
+function corsHeaders(contentType = "application/json; charset=utf-8") {
+  return {
+    "Content-Type": contentType,
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type"
-  });
+  };
+}
+
+function sendJson(response, statusCode, payload) {
+  response.writeHead(statusCode, corsHeaders());
   response.end(JSON.stringify(payload));
 }
 
 function sendEmpty(response, statusCode = 204) {
-  response.writeHead(statusCode, {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type"
-  });
+  response.writeHead(statusCode, corsHeaders());
   response.end();
 }
 
@@ -100,12 +91,12 @@ function badRequest(response, message) {
   sendJson(response, 400, { error: message });
 }
 
-function sanitizeDeviceId(deviceId) {
-  const value = String(deviceId || "").trim();
-  if (!/^[a-zA-Z0-9_-]{3,64}$/.test(value)) {
+function sanitizeId(value) {
+  const text = String(value || "").trim();
+  if (!/^[a-zA-Z0-9_-]{3,64}$/.test(text)) {
     return "";
   }
-  return value;
+  return text;
 }
 
 function sanitizeKeywordsMap(rawKeywords) {
@@ -115,7 +106,7 @@ function sanitizeKeywordsMap(rawKeywords) {
 
   const next = {};
   Object.entries(rawKeywords).forEach(([packageName, value]) => {
-    if (!sanitizeDeviceId(packageName) || !value || typeof value !== "object" || Array.isArray(value)) {
+    if (!sanitizeId(packageName) || !value || typeof value !== "object" || Array.isArray(value)) {
       return;
     }
 
@@ -129,7 +120,7 @@ function sanitizeKeywordsMap(rawKeywords) {
 }
 
 function sanitizePolicyPatch(payload, currentPolicy) {
-  const selectedPackage = sanitizeDeviceId(payload.selectedPackage) || currentPolicy.selectedPackage || "kids";
+  const selectedPackage = sanitizeId(payload.selectedPackage) || currentPolicy.selectedPackage || "kids";
   const filterMode = ["purpose", "blocklist", "allowlist"].includes(payload.filterMode)
     ? payload.filterMode
     : currentPolicy.filterMode || "blocklist";
@@ -167,7 +158,9 @@ async function readRequestJson(request) {
 }
 
 async function serveStatic(requestUrl, response) {
-  const pathname = requestUrl.pathname === "/" ? "/index.html" : requestUrl.pathname;
+  const pathname = ["/", "/parent", "/parent.html"].includes(requestUrl.pathname)
+    ? "/index.html"
+    : requestUrl.pathname;
   const requestedPath = path.normalize(path.join(PUBLIC_DIR, pathname));
 
   if (!requestedPath.startsWith(PUBLIC_DIR)) {
@@ -198,7 +191,7 @@ function routeDevicePath(pathname) {
   }
 
   return {
-    deviceId: sanitizeDeviceId(decodeURIComponent(match[1])),
+    deviceId: sanitizeId(decodeURIComponent(match[1])),
     action: match[2] || ""
   };
 }

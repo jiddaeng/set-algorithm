@@ -82,7 +82,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const customPackages = getCustomPackageEntries(rawKeywords);
-    select.innerHTML = "";
+    select.textContent = "";
 
     [
       ...Object.entries(PACKAGE_CONFIG).map(([value, config]) => ({
@@ -141,11 +141,11 @@ document.addEventListener("DOMContentLoaded", () => {
     modeRow.textContent = `모드: ${filterMode}`;
 
     const includeRow = document.createElement("div");
-    includeRow.textContent = `적합 키워드: ${config.include.join(", ") || "없음"}`;
+    includeRow.textContent = `허용 키워드: ${config.include.join(", ") || "없음"}`;
 
     const excludeRow = document.createElement("div");
     excludeRow.className = "small";
-    excludeRow.textContent = `부적합 키워드: ${config.exclude.join(", ") || "없음"}`;
+    excludeRow.textContent = `차단 키워드: ${config.exclude.join(", ") || "없음"}`;
 
     packageSummary.append(modeRow, includeRow, excludeRow);
   }
@@ -157,7 +157,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     filterStats.textContent = "";
-    ["분석 대상", "유지", "숨김"].forEach((label, index) => {
+    ["분석 대상", "표시", "숨김"].forEach((label, index) => {
       const values = [stats.total || 0, stats.kept || 0, stats.removed || 0];
       const row = document.createElement("div");
       row.textContent = `${label}: ${values[index]}`;

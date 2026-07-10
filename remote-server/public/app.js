@@ -23,6 +23,11 @@ const PACKAGE_LABELS = {
   development: "Development Pack",
   reading: "Reading Pack"
 };
+const FILTER_MODE_LABELS = {
+  blocklist: "차단 키워드만 숨기기",
+  allowlist: "허용 키워드가 있는 영상만 보이기",
+  purpose: "패키지 목적 점수로 판단"
+};
 
 let currentDeviceId = "";
 let currentPolicy = null;
@@ -52,7 +57,7 @@ async function api(path, options = {}) {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.error || `Request failed with ${response.status}`);
+    throw new Error(error.error || `요청 실패: ${response.status}`);
   }
 
   return response.json();
@@ -93,7 +98,7 @@ function renderMeta(policy) {
   const rows = [
     ["기기 ID", policy.deviceId],
     ["패키지", PACKAGE_LABELS[policy.selectedPackage] || policy.selectedPackage],
-    ["모드", policy.filterMode],
+    ["모드", FILTER_MODE_LABELS[policy.filterMode] || policy.filterMode],
     ["마지막 정책 수정", policy.updatedAt || "-"],
     ["마지막 확장 접속", policy.lastSeenAt || "-"]
   ];
@@ -109,13 +114,13 @@ function renderStats(stats) {
   statsBox.textContent = "";
 
   if (!stats) {
-    statsBox.textContent = "아직 필터 결과가 없습니다.";
+    statsBox.textContent = "아직 필터링 결과가 없습니다.";
     return;
   }
 
   [
     ["분석", stats.total || 0],
-    ["유지", stats.kept || 0],
+    ["표시", stats.kept || 0],
     ["숨김", stats.removed || 0]
   ].forEach(([label, value]) => {
     const item = document.createElement("div");
@@ -134,7 +139,7 @@ function renderStats(stats) {
 
 function createChip(keyword, type) {
   const chip = document.createElement("span");
-  chip.className = "chip";
+  chip.className = `chip ${type}`;
 
   const text = document.createElement("span");
   text.textContent = keyword;
@@ -156,7 +161,7 @@ function renderKeywordList(target, keywords, type) {
   if (!keywords.length) {
     const empty = document.createElement("div");
     empty.className = "empty";
-    empty.textContent = type === "include" ? "적합 키워드가 없습니다." : "부적합 키워드가 없습니다.";
+    empty.textContent = type === "include" ? "허용 키워드가 없습니다." : "차단 키워드가 없습니다.";
     target.appendChild(empty);
     return;
   }
@@ -186,7 +191,7 @@ function renderPolicy(policy) {
 async function loadDevice(deviceId) {
   const cleanDeviceId = String(deviceId || "").trim();
   if (!cleanDeviceId) {
-    setStatus("기기 ID가 필요합니다", "error");
+    setStatus("기기 ID가 필요합니다.", "error");
     return;
   }
 
@@ -223,7 +228,7 @@ function renderDeviceList(devices) {
     name.textContent = device.deviceId;
 
     const meta = document.createElement("span");
-    meta.textContent = device.lastSeenAt ? "online" : "new";
+    meta.textContent = device.lastSeenAt ? "synced" : "new";
 
     button.append(name, meta);
     button.addEventListener("click", () => loadDevice(device.deviceId).catch(showError));
@@ -281,7 +286,7 @@ async function savePolicy() {
 
 function showError(error) {
   console.error(error);
-  setStatus(error.message || "오류가 발생했습니다", "error");
+  setStatus(error.message || "오류가 발생했습니다.", "error");
 }
 
 loadDeviceButton.addEventListener("click", () => {

@@ -98,7 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
     row.className = "keyword-row";
 
     const label = document.createElement("span");
-    label.textContent = `${type === "include" ? "적합" : "부적합"}: ${keyword}`;
+    label.textContent = `${type === "include" ? "허용" : "차단"}: ${keyword}`;
 
     const actions = document.createElement("span");
     actions.className = "keyword-actions";
