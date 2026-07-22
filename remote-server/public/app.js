@@ -1,4 +1,8 @@
 const serverStatus = document.getElementById("serverStatus");
+const authPanel = document.getElementById("authPanel");
+const familyKeyInput = document.getElementById("familyKeyInput");
+const connectFamilyButton = document.getElementById("connectFamilyButton");
+const protectedContent = document.querySelectorAll(".protected-content");
 const deviceIdInput = document.getElementById("deviceIdInput");
 const loadDeviceButton = document.getElementById("loadDeviceButton");
 const refreshDevicesButton = document.getElementById("refreshDevicesButton");
@@ -15,7 +19,6 @@ const addExcludeButton = document.getElementById("addExcludeButton");
 const includeKeywordList = document.getElementById("includeKeywordList");
 const excludeKeywordList = document.getElementById("excludeKeywordList");
 
-const DEFAULT_DEVICE_ID = "demo-child";
 const PACKAGE_LABELS = {
   kids: "Kids Safe Pack",
   study: "Study Pack",
@@ -32,6 +35,7 @@ const FILTER_MODE_LABELS = {
 let currentDeviceId = "";
 let currentPolicy = null;
 let waitingForChildRevision = null;
+let familyKey = localStorage.getItem("setAlgorithmFamilyKey") || "";
 let currentKeywords = {
   include: [],
   exclude: []
@@ -39,7 +43,14 @@ let currentKeywords = {
 
 function getInitialDeviceId() {
   const params = new URLSearchParams(window.location.search);
-  return params.get("device") || localStorage.getItem("setAlgorithmDeviceId") || DEFAULT_DEVICE_ID;
+  return params.get("device") || localStorage.getItem("setAlgorithmDeviceId") || "";
+}
+
+function setAuthenticated(authenticated) {
+  authPanel.hidden = authenticated;
+  protectedContent.forEach(element => {
+    element.hidden = !authenticated;
+  });
 }
 
 function setStatus(text, type = "") {
@@ -51,6 +62,7 @@ async function api(path, options = {}) {
   const response = await fetch(path, {
     headers: {
       "Content-Type": "application/json",
+      ...(familyKey ? { "X-Family-Key": familyKey } : {}),
       ...(options.headers || {})
     },
     ...options
@@ -272,7 +284,9 @@ function renderDeviceList(devices) {
 
 async function refreshDevices() {
   const result = await api("/api/devices");
-  renderDeviceList(result.devices || []);
+  const devices = result.devices || [];
+  renderDeviceList(devices);
+  return devices;
 }
 
 function addKeyword(type) {
@@ -331,7 +345,29 @@ async function savePolicy() {
 
 function showError(error) {
   console.error(error);
+  if (error.status === 401) {
+    setAuthenticated(false);
+  }
   setStatus(error.message || "오류가 발생했습니다.", "error");
+}
+
+async function connectFamily() {
+  familyKey = familyKeyInput.value.trim();
+  setStatus("가족 키 확인 중");
+
+  const devices = await refreshDevices();
+  localStorage.setItem("setAlgorithmFamilyKey", familyKey);
+  setAuthenticated(true);
+
+  const preferredDeviceId = getInitialDeviceId();
+  const targetDevice = devices.find(device => device.deviceId === preferredDeviceId) || devices[0];
+  if (targetDevice) {
+    await loadDevice(targetDevice.deviceId);
+    setStatus("연결됨", "ok");
+    return;
+  }
+
+  setStatus("연결됨 · 확장 프로그램 등록 대기 중", "ok");
 }
 
 loadDeviceButton.addEventListener("click", () => {
@@ -344,6 +380,16 @@ refreshDevicesButton.addEventListener("click", () => {
 
 savePolicyButton.addEventListener("click", () => {
   savePolicy().catch(showError);
+});
+
+connectFamilyButton.addEventListener("click", () => {
+  connectFamily().catch(showError);
+});
+
+familyKeyInput.addEventListener("keydown", event => {
+  if (event.key === "Enter") {
+    connectFamily().catch(showError);
+  }
 });
 
 packageSelect.addEventListener("change", () => {
@@ -381,13 +427,20 @@ addExcludeButton.addEventListener("click", () => addKeyword("exclude"));
 async function boot() {
   try {
     setStatus("서버 연결 중");
-    await api("/api/health");
-    setStatus("서버 정상", "ok");
+    const health = await api("/api/health");
+    if (!health.configured) {
+      setStatus("Render의 FAMILY_KEY 설정이 필요합니다.", "error");
+      return;
+    }
 
-    const deviceId = getInitialDeviceId();
-    deviceIdInput.value = deviceId;
-    await loadDevice(deviceId);
-    await refreshDevices();
+    familyKeyInput.value = familyKey;
+    if (!health.authenticationRequired || familyKey) {
+      await connectFamily();
+      return;
+    }
+
+    setAuthenticated(false);
+    setStatus("가족 키를 입력하세요.");
   } catch (error) {
     showError(error);
   }

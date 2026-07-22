@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const manageKeywordsButton = document.getElementById("manageKeywordsButton");
   const remoteSyncEnabled = document.getElementById("remoteSyncEnabled");
   const remoteServerUrl = document.getElementById("remoteServerUrl");
+  const remoteFamilyKey = document.getElementById("remoteFamilyKey");
   const remoteDeviceId = document.getElementById("remoteDeviceId");
   const remoteSyncStatus = document.getElementById("remoteSyncStatus");
   const saveRemoteSettingsButton = document.getElementById("saveRemoteSettingsButton");
@@ -174,6 +175,10 @@ document.addEventListener("DOMContentLoaded", () => {
       remoteServerUrl.value = settings.serverUrl || "http://localhost:3000";
     }
 
+    if (remoteFamilyKey) {
+      remoteFamilyKey.value = settings.familyKey || "";
+    }
+
     if (remoteDeviceId) {
       remoteDeviceId.textContent = settings.deviceId || "-";
     }
@@ -259,7 +264,8 @@ document.addEventListener("DOMContentLoaded", () => {
       type: "SET_ALGORITHM_REMOTE_SETTINGS",
       settings: {
         enabled: Boolean(remoteSyncEnabled?.checked),
-        serverUrl: remoteServerUrl?.value || "http://localhost:3000"
+        serverUrl: remoteServerUrl?.value || "http://localhost:3000",
+        familyKey: remoteFamilyKey?.value || ""
       }
     }).then(loadPopupState);
   });

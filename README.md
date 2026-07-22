@@ -7,6 +7,7 @@
 1. 부모 원격 서버 실행
 
    ```powershell
+   $env:FAMILY_KEY="우리집에서만-쓸-긴-비밀번호"
    node server.js
    ```
 
@@ -32,6 +33,8 @@
    http://부모PC의-LAN-IP:3000
    ```
 
+   서버에 `FAMILY_KEY`를 설정했다면 확장 팝업과 부모 대시보드에도 같은 값을 입력합니다.
+
 5. 확장 팝업에 표시되는 `기기 ID`를 부모 대시보드에 입력하고 정책을 저장합니다.
 
 확장은 설치 후에도 30초마다 부모 서버 정책을 가져옵니다. 즉시 반영하려면 확장 팝업에서 `지금 동기화`를 누르면 됩니다.
@@ -45,29 +48,20 @@
 ## 개발 확인
 
 ```powershell
-node tests\classifier.test.js
-node --check server.js
-node --check background.js
-node --check content.js
-node --check popup.js
-node --check keyword-popup.js
-node --check remote-server\server.js
-node --check remote-server\public\app.js
+npm run check
 ```
 
-## Render deployment
+## Render 무료 배포
 
-`render.yaml` is included for a Render Blueprint deployment. It starts the Node server
-and mounts a persistent disk at `/var/data`, so device policies survive restarts and
-new deployments.
+루트의 `render.yaml`은 무료 Node 웹 서비스와 `FAMILY_KEY` 비밀값을 구성합니다.
 
-1. Push this project to a private GitHub repository.
-2. In Render, create a new Blueprint and select the repository.
-3. Approve the `starter` web service and 1 GB persistent disk requested by `render.yaml`.
-4. After deployment, enter the Render URL, such as `https://set-algorithm-remote.onrender.com`,
-   in the child extension's remote server address.
+1. 변경사항을 GitHub 저장소에 푸시합니다.
+2. Render Dashboard에서 `New > Blueprint`를 선택하고 이 저장소를 연결합니다.
+3. Blueprint 생성 화면에서 `FAMILY_KEY`에 충분히 긴 가족 전용 비밀번호를 입력합니다.
+4. 배포가 끝나면 서비스의 `https://...onrender.com` 주소를 복사합니다.
+5. 자녀 노트북의 확장 프로그램을 새로고침하고, 확장 팝업에 Render 주소와 같은 가족 키를 저장합니다.
+6. 휴대폰에서 `https://...onrender.com/parent`를 열고 같은 가족 키를 입력합니다.
 
-The application is a family-control tool. Before sharing the URL, add authentication
-for the parent dashboard and device API, or keep the URL private.
+확장에는 서버 주소를 `/parent` 없이 입력해야 합니다. 휴대폰과 노트북이 서로 다른 네트워크여도 둘 다 인터넷에 연결되어 있으면 동기화됩니다.
 
-실제 자녀 기기가 다른 네트워크에 있으면 `localhost`는 사용할 수 없습니다. 배포 서버 주소나 같은 네트워크에서 접근 가능한 부모 PC 주소를 확장 팝업에 넣어야 합니다.
+Render 무료 웹 서비스의 파일 시스템은 일시적입니다. 서버가 초기화되면 자녀 확장이 마지막으로 적용한 정책을 다음 접속 때 서버에 복구합니다. 자녀 확장의 저장 데이터까지 함께 삭제하면 복구할 수 없으므로, 영구 보관이 필요하면 유료 persistent disk를 `/var/data`에 연결하고 환경 변수 `DATA_DIR=/var/data`를 설정하세요.

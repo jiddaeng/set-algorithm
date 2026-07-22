@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: set-algorithm-remote
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: FAMILY_KEY
+        sync: false

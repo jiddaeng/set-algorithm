@@ -1,4 +1,5 @@
 const http = require("node:http");
+const crypto = require("node:crypto");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { URL } = require("node:url");
@@ -11,6 +12,8 @@ const DATA_DIR = dataDirectory
   ? path.resolve(dataDirectory)
   : path.join(ROOT_DIR, "data");
 const STORE_FILE = path.join(DATA_DIR, "policies.json");
+const FAMILY_KEY = String(process.env.FAMILY_KEY || "").trim();
+const IS_RENDER = Boolean(process.env.RENDER);
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -79,7 +82,7 @@ function corsHeaders(contentType = "application/json; charset=utf-8") {
     "Content-Type": contentType,
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type"
+    "Access-Control-Allow-Headers": "Content-Type, X-Family-Key"
   };
 }
 
@@ -99,6 +102,32 @@ function notFound(response) {
 
 function badRequest(response, message) {
   sendJson(response, 400, { error: message });
+}
+
+function hasValidFamilyKey(request) {
+  if (!FAMILY_KEY) {
+    return !IS_RENDER;
+  }
+
+  const suppliedKey = String(request.headers["x-family-key"] || "");
+  const expected = Buffer.from(FAMILY_KEY);
+  const supplied = Buffer.from(suppliedKey);
+
+  return expected.length === supplied.length && crypto.timingSafeEqual(expected, supplied);
+}
+
+function requireFamilyKey(request, response) {
+  if (hasValidFamilyKey(request)) {
+    return true;
+  }
+
+  if (!FAMILY_KEY && IS_RENDER) {
+    sendJson(response, 503, { error: "Server FAMILY_KEY is not configured." });
+    return false;
+  }
+
+  sendJson(response, 401, { error: "가족 키가 올바르지 않습니다." });
+  return false;
 }
 
 function sanitizeId(value) {
@@ -143,6 +172,33 @@ function sanitizePolicyPatch(payload, currentPolicy) {
     filterMode,
     customKeywords: sanitizeKeywordsMap(payload.customKeywords),
     updatedAt: now()
+  };
+}
+
+function sanitizeCachedPolicy(payload, deviceId) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+
+  const fallback = createDefaultPolicy(deviceId);
+  const selectedPackage = sanitizeId(payload.selectedPackage) || fallback.selectedPackage;
+  const filterMode = ["purpose", "blocklist", "allowlist"].includes(payload.filterMode)
+    ? payload.filterMode
+    : fallback.filterMode;
+
+  return {
+    ...fallback,
+    revision: getPolicyRevision(payload),
+    selectedPackage,
+    filterMode,
+    customKeywords: sanitizeKeywordsMap(payload.customKeywords),
+    createdAt: typeof payload.createdAt === "string" ? payload.createdAt : fallback.createdAt,
+    updatedAt: typeof payload.policyUpdatedAt === "string"
+      ? payload.policyUpdatedAt
+      : typeof payload.updatedAt === "string"
+        ? payload.updatedAt
+        : fallback.updatedAt,
+    recoveredAt: now()
   };
 }
 
@@ -215,7 +271,16 @@ async function handleApi(request, response, requestUrl) {
   }
 
   if (requestUrl.pathname === "/api/health" && request.method === "GET") {
-    sendJson(response, 200, { ok: true, time: now() });
+    sendJson(response, 200, {
+      ok: true,
+      time: now(),
+      authenticationRequired: Boolean(FAMILY_KEY),
+      configured: Boolean(FAMILY_KEY) || !IS_RENDER
+    });
+    return;
+  }
+
+  if (!requireFamilyKey(request, response)) {
     return;
   }
 
@@ -247,8 +312,16 @@ async function handleApi(request, response, requestUrl) {
 
   if (deviceRoute.action === "register" && request.method === "POST") {
     const payload = await readRequestJson(request);
+    const canRecoverCachedPolicy = !store.devices[deviceRoute.deviceId] || (
+      !policy.lastSeenAt &&
+      getPolicyRevision(policy) === 1
+    );
+    const recoveredPolicy = canRecoverCachedPolicy
+      ? sanitizeCachedPolicy(payload.cachedPolicy, deviceRoute.deviceId)
+      : null;
+
     store.devices[deviceRoute.deviceId] = {
-      ...policy,
+      ...(recoveredPolicy || policy),
       extensionVersion: payload.extensionVersion || policy.extensionVersion || "",
       userAgent: payload.userAgent || policy.userAgent || "",
       lastSeenAt: now()

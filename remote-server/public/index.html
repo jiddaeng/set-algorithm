@@ -16,7 +16,19 @@
         <div id="serverStatus" class="status">서버 확인 중</div>
       </header>
 
-      <section class="control-grid">
+      <section id="authPanel" class="panel auth-panel">
+        <div>
+          <h2>가족 인증</h2>
+          <p class="hint">Render 배포 때 설정한 FAMILY_KEY를 입력하세요.</p>
+        </div>
+        <label>
+          <span>가족 키</span>
+          <input id="familyKeyInput" type="password" autocomplete="current-password" />
+        </label>
+        <button id="connectFamilyButton" type="button">관리 시작</button>
+      </section>
+
+      <section class="control-grid protected-content" hidden>
         <div class="panel device-panel">
           <h2>기기 연결</h2>
           <label>
@@ -38,7 +50,7 @@
         </div>
       </section>
 
-      <section class="panel policy-panel">
+      <section class="panel policy-panel protected-content" hidden>
         <div class="panel-heading">
           <div>
             <h2>필터 정책</h2>

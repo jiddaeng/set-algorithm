@@ -3,6 +3,7 @@ let inFlightRemoteSync = null;
 const DEFAULT_REMOTE_SETTINGS = {
     enabled: true,
     serverUrl: "http://localhost:3000",
+    familyKey: "",
     deviceId: "",
     pollIntervalMinutes: 0.5
 };
@@ -57,6 +58,7 @@ function normalizeRemoteSettings(rawSettings = {}) {
     return {
         enabled: settings.enabled !== false,
         serverUrl: normalizeServerUrl(settings.serverUrl),
+        familyKey: String(settings.familyKey || "").trim(),
         deviceId: String(settings.deviceId || "").trim() || generateDeviceId(),
         pollIntervalMinutes: Math.max(0.5, Number(settings.pollIntervalMinutes) || DEFAULT_REMOTE_SETTINGS.pollIntervalMinutes)
     };
@@ -70,6 +72,7 @@ async function ensureRemoteSettings() {
     if (
         currentSettings.enabled !== settings.enabled ||
         currentSettings.serverUrl !== settings.serverUrl ||
+        currentSettings.familyKey !== settings.familyKey ||
         currentSettings.deviceId !== settings.deviceId ||
         currentSettings.pollIntervalMinutes !== settings.pollIntervalMinutes
     ) {
@@ -83,16 +86,25 @@ function buildDeviceUrl(settings, path) {
     return `${settings.serverUrl}/api/devices/${encodeURIComponent(settings.deviceId)}${path}`;
 }
 
-async function registerDevice(settings) {
+function buildRemoteHeaders(settings, headers = {}) {
+    const nextHeaders = { ...headers };
+    if (settings.familyKey) {
+        nextHeaders["X-Family-Key"] = settings.familyKey;
+    }
+    return nextHeaders;
+}
+
+async function registerDevice(settings, cachedPolicy = null) {
     await fetch(buildDeviceUrl(settings, "/register"), {
         method: "POST",
-        headers: {
+        headers: buildRemoteHeaders(settings, {
             "Content-Type": "application/json"
-        },
+        }),
         body: JSON.stringify({
             extensionVersion: chrome.runtime.getManifest().version,
             userAgent: navigator.userAgent,
-            registeredAt: new Date().toISOString()
+            registeredAt: new Date().toISOString(),
+            cachedPolicy
         })
     });
 }
@@ -138,9 +150,9 @@ function sanitizePolicy(policy) {
 async function acknowledgePolicy(settings, policy) {
     const response = await fetch(buildDeviceUrl(settings, "/ack"), {
         method: "POST",
-        headers: {
+        headers: buildRemoteHeaders(settings, {
             "Content-Type": "application/json"
-        },
+        }),
         body: JSON.stringify({ revision: policy.revision })
     });
 
@@ -231,13 +243,14 @@ async function runRemotePolicySync(reason = "alarm") {
     }
 
     try {
-        await registerDevice(settings);
+        const cachedResult = await storageGet(["parentPolicy"]);
+        await registerDevice(settings, cachedResult.parentPolicy || null);
 
         const response = await fetch(buildDeviceUrl(settings, "/policy"), {
             cache: "no-store",
-            headers: {
+            headers: buildRemoteHeaders(settings, {
                 "Accept": "application/json"
-            }
+            })
         });
 
         if (!response.ok) {
@@ -300,9 +313,9 @@ async function uploadStats(stats) {
     try {
         await fetch(buildDeviceUrl(settings, "/stats"), {
             method: "POST",
-            headers: {
+            headers: buildRemoteHeaders(settings, {
                 "Content-Type": "application/json"
-            },
+            }),
             body: JSON.stringify({
                 ...stats,
                 uploadedAt: new Date().toISOString()
