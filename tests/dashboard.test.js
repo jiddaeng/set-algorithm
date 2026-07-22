@@ -40,6 +40,11 @@ function jsonResponse(payload, status = 200) {
   };
 }
 
+function findElements(root, predicate) {
+  const matches = predicate(root) ? [root] : [];
+  return matches.concat(root.children.flatMap(child => findElements(child, predicate)));
+}
+
 async function flushPromises() {
   for (let attempt = 0; attempt < 10; attempt += 1) {
     await new Promise(resolve => setImmediate(resolve));
@@ -62,7 +67,7 @@ async function run() {
     deviceId: "kid-test123",
     selectedPackage: "kids",
     filterMode: "blocklist",
-    customKeywords: { kids: { include: [], exclude: ["폭력"] } },
+    customKeywords: { kids: { include: ["맞춤 키워드"], exclude: ["폭력"] } },
     revision: 1,
     updatedAt: "2026-07-22T00:00:00.000Z",
     lastSeenAt: "2026-07-22T00:00:00.000Z"
@@ -71,7 +76,21 @@ async function run() {
   const context = {
     console,
     URLSearchParams,
-    window: { location: { search: "" } },
+    window: {
+      location: { search: "" },
+      PACKAGE_CONFIG: {
+        kids: {
+          label: "Kids Safe Pack",
+          include: ["kids", "교육"],
+          exclude: ["폭력"]
+        },
+        study: {
+          label: "Study Pack",
+          include: ["study", "공부"],
+          exclude: ["game"]
+        }
+      }
+    },
     localStorage: {
       getItem: key => localValues.get(key) || null,
       setItem: (key, value) => localValues.set(key, String(value))
@@ -108,6 +127,13 @@ async function run() {
   await flushPromises();
 
   assert.equal(elements.packageSelect.value, "kids");
+  const baseChips = findElements(elements.includeKeywordList, element => element.className.includes("chip include base"));
+  const customChips = findElements(elements.includeKeywordList, element => element.className === "chip include");
+  assert.equal(baseChips.length, 2);
+  assert.equal(customChips.length, 1);
+  assert.equal(findElements(baseChips[0], element => element.dataset.keyword).length, 0);
+  assert.equal(findElements(customChips[0], element => element.dataset.keyword === "맞춤 키워드").length, 1);
+
   elements.packageSelect.value = "study";
   elements.packageSelect.listeners.change();
   assert.equal(elements.savePolicyButton.textContent, "정책 저장 · 변경됨");

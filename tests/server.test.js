@@ -28,6 +28,11 @@ async function run() {
   };
 
   try {
+    const packagesResponse = await request(baseUrl, "/shared/packages.js");
+    assert.equal(packagesResponse.status, 200);
+    assert.match(packagesResponse.headers.get("content-type"), /javascript/);
+    assert.match(await packagesResponse.text(), /const PACKAGE_CONFIG/);
+
     const healthResponse = await request(baseUrl, "/api/health");
     assert.equal(healthResponse.status, 200);
     const health = await healthResponse.json();

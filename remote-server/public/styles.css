@@ -266,6 +266,26 @@ h3 {
   padding: 10px;
 }
 
+.keyword-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.keyword-group + .keyword-group {
+  border-top: 1px dashed #dbe3f1;
+  margin-top: 4px;
+  padding-top: 10px;
+}
+
+.keyword-group-label {
+  width: 100%;
+  color: #66728a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .chip {
   display: inline-flex;
   align-items: center;
@@ -281,6 +301,12 @@ h3 {
 .chip.exclude {
   background: #fff1f2;
   color: #9f1239;
+}
+
+.chip.base {
+  border: 1px solid #dbe3f1;
+  background: #f8fafc;
+  color: #526078;
 }
 
 .chip button {

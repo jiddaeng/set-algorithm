@@ -7,6 +7,7 @@ const { URL } = require("node:url");
 const PORT = Number(process.env.PORT || 3000);
 const ROOT_DIR = __dirname;
 const PUBLIC_DIR = path.join(ROOT_DIR, "public");
+const SHARED_PACKAGES_FILE = path.join(ROOT_DIR, "..", "packages.js");
 const dataDirectory = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH;
 const DATA_DIR = dataDirectory
   ? path.resolve(dataDirectory)
@@ -318,6 +319,16 @@ async function readRequestJson(request) {
 }
 
 async function serveStatic(requestUrl, response) {
+  if (requestUrl.pathname === "/shared/packages.js") {
+    const content = await fs.readFile(SHARED_PACKAGES_FILE);
+    response.writeHead(200, {
+      "Content-Type": MIME_TYPES[".js"],
+      "Cache-Control": "no-cache"
+    });
+    response.end(content);
+    return;
+  }
+
   const pathname = ["/", "/parent", "/parent.html"].includes(requestUrl.pathname)
     ? "/index.html"
     : requestUrl.pathname;

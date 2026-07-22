@@ -19,18 +19,43 @@ const addExcludeButton = document.getElementById("addExcludeButton");
 const includeKeywordList = document.getElementById("includeKeywordList");
 const excludeKeywordList = document.getElementById("excludeKeywordList");
 
-const PACKAGE_LABELS = {
+const BASE_PACKAGE_CONFIG = window.PACKAGE_CONFIG || {};
+const FALLBACK_PACKAGE_LABELS = {
   kids: "Kids Safe Pack",
   study: "Study Pack",
   workout: "Workout Pack",
   development: "Development Pack",
   reading: "Reading Pack"
 };
+const PACKAGE_LABELS = {
+  ...FALLBACK_PACKAGE_LABELS,
+  ...Object.fromEntries(
+    Object.entries(BASE_PACKAGE_CONFIG).map(([packageName, config]) => [
+      packageName,
+      config.label || packageName
+    ])
+  )
+};
 const FILTER_MODE_LABELS = {
   blocklist: "차단 키워드만 숨기기",
   allowlist: "허용 키워드가 있는 영상만 보이기",
   purpose: "패키지 목적 점수로 판단"
 };
+
+function initializePackageSelect() {
+  const packages = Object.entries(BASE_PACKAGE_CONFIG);
+  if (!packages.length) {
+    return;
+  }
+
+  packageSelect.textContent = "";
+  packages.forEach(([packageName, config]) => {
+    const option = document.createElement("option");
+    option.value = packageName;
+    option.textContent = config.label || packageName;
+    packageSelect.appendChild(option);
+  });
+}
 
 let currentDeviceId = "";
 let currentPolicy = null;
@@ -110,14 +135,27 @@ function getPolicyKeywords(policy, packageName = policy?.selectedPackage || "kid
   };
 }
 
+function getBaseKeywords(packageName, type) {
+  return normalizeKeywordList(BASE_PACKAGE_CONFIG[packageName]?.[type]);
+}
+
+function keywordKey(keyword) {
+  return String(keyword).trim().toLocaleLowerCase();
+}
+
+function removeBaseKeywordDuplicates(keywords, packageName, type) {
+  const baseKeys = new Set(getBaseKeywords(packageName, type).map(keywordKey));
+  return normalizeKeywordList(keywords).filter(keyword => !baseKeys.has(keywordKey(keyword)));
+}
+
 function setPolicyKeywords(policy, packageName, keywords) {
   return {
     ...policy,
     customKeywords: {
       ...(policy.customKeywords || {}),
       [packageName]: {
-        include: normalizeKeywordList(keywords.include),
-        exclude: normalizeKeywordList(keywords.exclude)
+        include: removeBaseKeywordDuplicates(keywords.include, packageName, "include"),
+        exclude: removeBaseKeywordDuplicates(keywords.exclude, packageName, "exclude")
       }
     }
   };
@@ -170,12 +208,18 @@ function renderStats(stats) {
   });
 }
 
-function createChip(keyword, type) {
+function createChip(keyword, type, removable = true) {
   const chip = document.createElement("span");
-  chip.className = `chip ${type}`;
+  chip.className = `chip ${type}${removable ? "" : " base"}`;
+  chip.title = removable ? "관리자 추가 키워드" : "packages.js 기본 키워드";
 
   const text = document.createElement("span");
   text.textContent = keyword;
+  chip.append(text);
+
+  if (!removable) {
+    return chip;
+  }
 
   const button = document.createElement("button");
   button.type = "button";
@@ -184,14 +228,35 @@ function createChip(keyword, type) {
   button.textContent = "x";
   button.title = `${keyword} 삭제`;
 
-  chip.append(text, button);
+  chip.append(button);
   return chip;
 }
 
-function renderKeywordList(target, keywords, type) {
-  target.textContent = "";
-
+function appendKeywordGroup(target, label, keywords, type, removable) {
   if (!keywords.length) {
+    return;
+  }
+
+  const group = document.createElement("div");
+  group.className = "keyword-group";
+
+  const groupLabel = document.createElement("div");
+  groupLabel.className = "keyword-group-label";
+  groupLabel.textContent = label;
+  group.appendChild(groupLabel);
+
+  keywords.forEach(keyword => {
+    group.appendChild(createChip(keyword, type, removable));
+  });
+  target.appendChild(group);
+}
+
+function renderKeywordList(target, keywords, type, packageName = packageSelect.value) {
+  target.textContent = "";
+  const baseKeywords = getBaseKeywords(packageName, type);
+  const customKeywords = removeBaseKeywordDuplicates(keywords, packageName, type);
+
+  if (!baseKeywords.length && !customKeywords.length) {
     const empty = document.createElement("div");
     empty.className = "empty";
     empty.textContent = type === "include" ? "허용 키워드가 없습니다." : "차단 키워드가 없습니다.";
@@ -199,9 +264,8 @@ function renderKeywordList(target, keywords, type) {
     return;
   }
 
-  keywords.forEach(keyword => {
-    target.appendChild(createChip(keyword, type));
-  });
+  appendKeywordGroup(target, "기본 키워드 · packages.js", baseKeywords, type, false);
+  appendKeywordGroup(target, "관리자 추가 키워드", customKeywords, type, true);
 }
 
 function renderPolicy(policy, options = {}) {
@@ -482,6 +546,7 @@ async function boot() {
   }
 }
 
+initializePackageSelect();
 boot();
 setInterval(() => {
   if (!currentDeviceId) {
