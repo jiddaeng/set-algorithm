@@ -3,7 +3,7 @@ let inFlightRemoteSync = null;
 const DEFAULT_REMOTE_SETTINGS = {
     enabled: true,
     serverUrl: "http://localhost:3000",
-    familyKey: "",
+    deviceKey: "",
     deviceId: "",
     pollIntervalMinutes: 0.5
 };
@@ -58,7 +58,7 @@ function normalizeRemoteSettings(rawSettings = {}) {
     return {
         enabled: settings.enabled !== false,
         serverUrl: normalizeServerUrl(settings.serverUrl),
-        familyKey: String(settings.familyKey || "").trim(),
+        deviceKey: String(settings.deviceKey || settings.familyKey || "").trim(),
         deviceId: String(settings.deviceId || "").trim() || generateDeviceId(),
         pollIntervalMinutes: Math.max(0.5, Number(settings.pollIntervalMinutes) || DEFAULT_REMOTE_SETTINGS.pollIntervalMinutes)
     };
@@ -72,7 +72,7 @@ async function ensureRemoteSettings() {
     if (
         currentSettings.enabled !== settings.enabled ||
         currentSettings.serverUrl !== settings.serverUrl ||
-        currentSettings.familyKey !== settings.familyKey ||
+        currentSettings.deviceKey !== settings.deviceKey ||
         currentSettings.deviceId !== settings.deviceId ||
         currentSettings.pollIntervalMinutes !== settings.pollIntervalMinutes
     ) {
@@ -88,8 +88,8 @@ function buildDeviceUrl(settings, path) {
 
 function buildRemoteHeaders(settings, headers = {}) {
     const nextHeaders = { ...headers };
-    if (settings.familyKey) {
-        nextHeaders["X-Family-Key"] = settings.familyKey;
+    if (settings.deviceKey) {
+        nextHeaders["X-Device-Key"] = settings.deviceKey;
     }
     return nextHeaders;
 }
@@ -143,7 +143,8 @@ function sanitizePolicy(policy) {
         customKeywords: sanitizeKeywordsMap(policy?.customKeywords),
         filterMode: normalizeFilterModeValue(policy?.filterMode),
         revision: Number.isInteger(Number(policy?.revision)) && Number(policy.revision) > 0 ? Number(policy.revision) : 1,
-        policyUpdatedAt: policy?.updatedAt || ""
+        policyUpdatedAt: policy?.updatedAt || policy?.policyUpdatedAt || "",
+        policySignature: String(policy?.policySignature || "")
     };
 }
 

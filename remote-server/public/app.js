@@ -36,6 +36,7 @@ let currentDeviceId = "";
 let currentPolicy = null;
 let waitingForChildRevision = null;
 let familyKey = localStorage.getItem("setAlgorithmFamilyKey") || "";
+let editorDirty = false;
 let currentKeywords = {
   include: [],
   exclude: []
@@ -56,6 +57,20 @@ function setAuthenticated(authenticated) {
 function setStatus(text, type = "") {
   serverStatus.textContent = text;
   serverStatus.className = `status ${type}`.trim();
+}
+
+function setEditorDirty(dirty) {
+  editorDirty = dirty;
+  savePolicyButton.textContent = dirty ? "정책 저장 · 변경됨" : "정책 저장";
+}
+
+function markEditorDirty() {
+  if (!currentPolicy) {
+    return;
+  }
+
+  setEditorDirty(true);
+  setStatus("저장되지 않은 변경사항이 있습니다.");
 }
 
 async function api(path, options = {}) {
@@ -189,20 +204,24 @@ function renderKeywordList(target, keywords, type) {
   });
 }
 
-function renderPolicy(policy) {
-  currentPolicy = policy;
+function renderPolicy(policy, options = {}) {
+  const preserveEditor = options.preserveEditor === true;
   currentDeviceId = policy.deviceId;
   localStorage.setItem("setAlgorithmDeviceId", currentDeviceId);
 
   deviceIdInput.value = currentDeviceId;
-  packageSelect.value = policy.selectedPackage || "kids";
-  filterModeSelect.value = policy.filterMode || "blocklist";
-  currentKeywords = getPolicyKeywords(policy, packageSelect.value);
+  if (!preserveEditor) {
+    currentPolicy = policy;
+    packageSelect.value = policy.selectedPackage || "kids";
+    filterModeSelect.value = policy.filterMode || "blocklist";
+    currentKeywords = getPolicyKeywords(policy, packageSelect.value);
+    renderKeywordList(includeKeywordList, currentKeywords.include, "include");
+    renderKeywordList(excludeKeywordList, currentKeywords.exclude, "exclude");
+    setEditorDirty(false);
+  }
 
   renderMeta(policy);
   renderStats(policy.stats || null);
-  renderKeywordList(includeKeywordList, currentKeywords.include, "include");
-  renderKeywordList(excludeKeywordList, currentKeywords.exclude, "exclude");
   highlightActiveDevice();
 
   if (waitingForChildRevision && Number(policy.lastAppliedRevision || 0) >= waitingForChildRevision) {
@@ -219,7 +238,7 @@ async function waitForChildPolicyApplication(deviceId, revision) {
   for (let attempt = 0; attempt < 15 && waitingForChildRevision === revision; attempt += 1) {
     await delay(2000);
     const policy = await api(`/api/devices/${encodeURIComponent(deviceId)}/policy`);
-    renderPolicy(policy);
+    renderPolicy(policy, { preserveEditor: editorDirty });
 
     if (Number(policy.lastAppliedRevision || 0) >= revision) {
       return;
@@ -232,17 +251,23 @@ async function waitForChildPolicyApplication(deviceId, revision) {
   }
 }
 
-async function loadDevice(deviceId) {
+async function loadDevice(deviceId, options = {}) {
   const cleanDeviceId = String(deviceId || "").trim();
   if (!cleanDeviceId) {
     setStatus("기기 ID가 필요합니다.", "error");
     return;
   }
 
-  setStatus("정책 불러오는 중");
+  if (!options.silent) {
+    setStatus("정책 불러오는 중");
+  }
   const policy = await api(`/api/devices/${encodeURIComponent(cleanDeviceId)}/policy`);
-  renderPolicy(policy);
-  setStatus("연결됨", "ok");
+  renderPolicy(policy, {
+    preserveEditor: options.preserveEditor ?? editorDirty
+  });
+  if (!options.silent) {
+    setStatus("연결됨", "ok");
+  }
 }
 
 function highlightActiveDevice() {
@@ -275,7 +300,10 @@ function renderDeviceList(devices) {
     meta.textContent = device.lastSeenAt ? "synced" : "new";
 
     button.append(name, meta);
-    button.addEventListener("click", () => loadDevice(device.deviceId).catch(showError));
+    button.addEventListener("click", () => {
+      setEditorDirty(false);
+      loadDevice(device.deviceId, { preserveEditor: false }).catch(showError);
+    });
     deviceList.appendChild(button);
   });
 
@@ -301,11 +329,13 @@ function addKeyword(type) {
   input.value = "";
   input.focus();
   renderKeywordList(type === "include" ? includeKeywordList : excludeKeywordList, currentKeywords[type], type);
+  markEditorDirty();
 }
 
 function removeKeyword(type, keyword) {
   currentKeywords[type] = (currentKeywords[type] || []).filter(item => item !== keyword);
   renderKeywordList(type === "include" ? includeKeywordList : excludeKeywordList, currentKeywords[type], type);
+  markEditorDirty();
 }
 
 async function savePolicy() {
@@ -327,6 +357,7 @@ async function savePolicy() {
       method: "PUT",
       body: JSON.stringify(nextPolicy)
     });
+    setEditorDirty(false);
     renderPolicy(savedPolicy);
     await refreshDevices();
     waitingForChildRevision = Number(savedPolicy.revision || 1);
@@ -334,6 +365,7 @@ async function savePolicy() {
     waitForChildPolicyApplication(savedPolicy.deviceId, waitingForChildRevision).catch(showError);
   } catch (error) {
     if (error.status === 409 && error.policy) {
+      setEditorDirty(false);
       renderPolicy(error.policy);
       await refreshDevices();
       setStatus("다른 부모 정책이 먼저 저장되어 최신 상태를 불러왔습니다.", "error");
@@ -362,7 +394,7 @@ async function connectFamily() {
   const preferredDeviceId = getInitialDeviceId();
   const targetDevice = devices.find(device => device.deviceId === preferredDeviceId) || devices[0];
   if (targetDevice) {
-    await loadDevice(targetDevice.deviceId);
+    await loadDevice(targetDevice.deviceId, { preserveEditor: false });
     setStatus("연결됨", "ok");
     return;
   }
@@ -371,7 +403,8 @@ async function connectFamily() {
 }
 
 loadDeviceButton.addEventListener("click", () => {
-  loadDevice(deviceIdInput.value).then(refreshDevices).catch(showError);
+  setEditorDirty(false);
+  loadDevice(deviceIdInput.value, { preserveEditor: false }).then(refreshDevices).catch(showError);
 });
 
 refreshDevicesButton.addEventListener("click", () => {
@@ -400,7 +433,10 @@ packageSelect.addEventListener("change", () => {
   currentKeywords = getPolicyKeywords(currentPolicy, packageSelect.value);
   renderKeywordList(includeKeywordList, currentKeywords.include, "include");
   renderKeywordList(excludeKeywordList, currentKeywords.exclude, "exclude");
+  markEditorDirty();
 });
+
+filterModeSelect.addEventListener("change", markEditorDirty);
 
 addIncludeButton.addEventListener("click", () => addKeyword("include"));
 addExcludeButton.addEventListener("click", () => addKeyword("exclude"));
@@ -429,7 +465,7 @@ async function boot() {
     setStatus("서버 연결 중");
     const health = await api("/api/health");
     if (!health.configured) {
-      setStatus("Render의 FAMILY_KEY 설정이 필요합니다.", "error");
+      setStatus("Render의 FAMILY_KEY와 DEVICE_KEY 설정이 필요합니다.", "error");
       return;
     }
 
@@ -453,7 +489,7 @@ setInterval(() => {
   }
 
   Promise.all([
-    loadDevice(currentDeviceId),
+    loadDevice(currentDeviceId, { silent: true }),
     refreshDevices()
   ]).catch(showError);
 }, 8000);

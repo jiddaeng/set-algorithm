@@ -8,6 +8,6 @@
   },
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js && node --check remote-server/server.js && node --check background.js && node --check popup.js && node --check remote-server/public/app.js && node tests/classifier.test.js && node tests/server.test.js"
+    "check": "node --check server.js && node --check remote-server/server.js && node --check background.js && node --check popup.js && node --check remote-server/public/app.js && node tests/classifier.test.js && node tests/server.test.js && node tests/dashboard.test.js"
   }
 }

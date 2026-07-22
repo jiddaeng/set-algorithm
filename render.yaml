@@ -10,3 +10,5 @@ services:
     envVars:
       - key: FAMILY_KEY
         sync: false
+      - key: DEVICE_KEY
+        sync: false

@@ -13,6 +13,7 @@ const DATA_DIR = dataDirectory
   : path.join(ROOT_DIR, "data");
 const STORE_FILE = path.join(DATA_DIR, "policies.json");
 const FAMILY_KEY = String(process.env.FAMILY_KEY || "").trim();
+const DEVICE_KEY = String(process.env.DEVICE_KEY || "").trim();
 const IS_RENDER = Boolean(process.env.RENDER);
 
 const MIME_TYPES = {
@@ -82,7 +83,7 @@ function corsHeaders(contentType = "application/json; charset=utf-8") {
     "Content-Type": contentType,
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-Family-Key"
+    "Access-Control-Allow-Headers": "Content-Type, X-Family-Key, X-Device-Key"
   };
 }
 
@@ -104,29 +105,64 @@ function badRequest(response, message) {
   sendJson(response, 400, { error: message });
 }
 
-function hasValidFamilyKey(request) {
-  if (!FAMILY_KEY) {
+function hasValidSecret(request, headerName, expectedSecret) {
+  if (!expectedSecret) {
     return !IS_RENDER;
   }
 
-  const suppliedKey = String(request.headers["x-family-key"] || "");
-  const expected = Buffer.from(FAMILY_KEY);
+  const suppliedKey = String(request.headers[headerName] || "");
+  const expected = Buffer.from(expectedSecret);
   const supplied = Buffer.from(suppliedKey);
 
   return expected.length === supplied.length && crypto.timingSafeEqual(expected, supplied);
 }
 
-function requireFamilyKey(request, response) {
-  if (hasValidFamilyKey(request)) {
+function requireSecret(request, response, options) {
+  if (hasValidSecret(request, options.headerName, options.secret)) {
     return true;
   }
 
-  if (!FAMILY_KEY && IS_RENDER) {
-    sendJson(response, 503, { error: "Server FAMILY_KEY is not configured." });
+  if (!options.secret && IS_RENDER) {
+    sendJson(response, 503, { error: `Server ${options.environmentName} is not configured.` });
     return false;
   }
 
-  sendJson(response, 401, { error: "가족 키가 올바르지 않습니다." });
+  sendJson(response, 401, { error: options.errorMessage });
+  return false;
+}
+
+function requireFamilyKey(request, response) {
+  return requireSecret(request, response, {
+    headerName: "x-family-key",
+    secret: FAMILY_KEY,
+    environmentName: "FAMILY_KEY",
+    errorMessage: "가족 키가 올바르지 않습니다."
+  });
+}
+
+function requireDeviceKey(request, response) {
+  return requireSecret(request, response, {
+    headerName: "x-device-key",
+    secret: DEVICE_KEY,
+    environmentName: "DEVICE_KEY",
+    errorMessage: "기기 연결 키가 올바르지 않습니다."
+  });
+}
+
+function requireFamilyOrDeviceKey(request, response) {
+  if (
+    hasValidSecret(request, "x-family-key", FAMILY_KEY) ||
+    hasValidSecret(request, "x-device-key", DEVICE_KEY)
+  ) {
+    return true;
+  }
+
+  if (IS_RENDER && (!FAMILY_KEY || !DEVICE_KEY)) {
+    sendJson(response, 503, { error: "Server FAMILY_KEY or DEVICE_KEY is not configured." });
+    return false;
+  }
+
+  sendJson(response, 401, { error: "인증 키가 올바르지 않습니다." });
   return false;
 }
 
@@ -199,6 +235,62 @@ function sanitizeCachedPolicy(payload, deviceId) {
         ? payload.updatedAt
         : fallback.updatedAt,
     recoveredAt: now()
+  };
+}
+
+function stableStringify(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(",")}]`;
+  }
+
+  if (value && typeof value === "object") {
+    const entries = Object.keys(value)
+      .sort()
+      .map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`);
+    return `{${entries.join(",")}}`;
+  }
+
+  return JSON.stringify(value);
+}
+
+function getPolicySignaturePayload(policy, deviceId = policy?.deviceId) {
+  return {
+    deviceId: sanitizeId(deviceId),
+    revision: getPolicyRevision(policy),
+    selectedPackage: sanitizeId(policy?.selectedPackage) || "kids",
+    filterMode: ["purpose", "blocklist", "allowlist"].includes(policy?.filterMode)
+      ? policy.filterMode
+      : "blocklist",
+    customKeywords: sanitizeKeywordsMap(policy?.customKeywords),
+    policyUpdatedAt: String(policy?.policyUpdatedAt || policy?.updatedAt || "")
+  };
+}
+
+function createPolicySignature(policy, deviceId = policy?.deviceId) {
+  if (!FAMILY_KEY) {
+    return "";
+  }
+
+  return crypto
+    .createHmac("sha256", FAMILY_KEY)
+    .update(stableStringify(getPolicySignaturePayload(policy, deviceId)))
+    .digest("hex");
+}
+
+function hasValidPolicySignature(policy, deviceId) {
+  if (!FAMILY_KEY) {
+    return !IS_RENDER;
+  }
+
+  const supplied = Buffer.from(String(policy?.policySignature || ""));
+  const expected = Buffer.from(createPolicySignature(policy, deviceId));
+  return supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected);
+}
+
+function withPolicySignature(policy) {
+  return {
+    ...policy,
+    policySignature: createPolicySignature(policy)
   };
 }
 
@@ -275,16 +367,17 @@ async function handleApi(request, response, requestUrl) {
       ok: true,
       time: now(),
       authenticationRequired: Boolean(FAMILY_KEY),
-      configured: Boolean(FAMILY_KEY) || !IS_RENDER
+      deviceAuthenticationRequired: Boolean(DEVICE_KEY),
+      configured: (Boolean(FAMILY_KEY) && Boolean(DEVICE_KEY)) || !IS_RENDER
     });
     return;
   }
 
-  if (!requireFamilyKey(request, response)) {
-    return;
-  }
-
   if (requestUrl.pathname === "/api/devices" && request.method === "GET") {
+    if (!requireFamilyKey(request, response)) {
+      return;
+    }
+
     const store = await loadStore();
     const devices = Object.values(store.devices || {}).map(policy => ({
       deviceId: policy.deviceId,
@@ -307,6 +400,23 @@ async function handleApi(request, response, requestUrl) {
     return;
   }
 
+  if (["register", "ack", "stats"].includes(deviceRoute.action)) {
+    if (!requireDeviceKey(request, response)) {
+      return;
+    }
+  } else if (deviceRoute.action === "policy" && request.method === "GET") {
+    if (!requireFamilyOrDeviceKey(request, response)) {
+      return;
+    }
+  } else if (deviceRoute.action === "policy" && request.method === "PUT") {
+    if (!requireFamilyKey(request, response)) {
+      return;
+    }
+  } else {
+    badRequest(response, "Unsupported API route");
+    return;
+  }
+
   const store = await loadStore();
   const policy = getDevicePolicy(store, deviceRoute.deviceId);
 
@@ -316,7 +426,7 @@ async function handleApi(request, response, requestUrl) {
       !policy.lastSeenAt &&
       getPolicyRevision(policy) === 1
     );
-    const recoveredPolicy = canRecoverCachedPolicy
+    const recoveredPolicy = canRecoverCachedPolicy && hasValidPolicySignature(payload.cachedPolicy, deviceRoute.deviceId)
       ? sanitizeCachedPolicy(payload.cachedPolicy, deviceRoute.deviceId)
       : null;
 
@@ -327,14 +437,17 @@ async function handleApi(request, response, requestUrl) {
       lastSeenAt: now()
     };
     await saveStore(store);
-    sendJson(response, 200, { ok: true, policy: store.devices[deviceRoute.deviceId] });
+    sendJson(response, 200, {
+      ok: true,
+      policy: withPolicySignature(store.devices[deviceRoute.deviceId])
+    });
     return;
   }
 
   if (deviceRoute.action === "policy" && request.method === "GET") {
     policy.lastSeenAt = now();
     await saveStore(store);
-    sendJson(response, 200, policy);
+    sendJson(response, 200, withPolicySignature(policy));
     return;
   }
 
@@ -346,17 +459,17 @@ async function handleApi(request, response, requestUrl) {
     if (!Number.isInteger(requestedRevision) || requestedRevision !== currentRevision) {
       sendJson(response, 409, {
         error: "Policy changed by the parent dashboard. Reload before saving again.",
-        policy: {
+        policy: withPolicySignature({
           ...policy,
           revision: currentRevision
-        }
+        })
       });
       return;
     }
 
     store.devices[deviceRoute.deviceId] = sanitizePolicyPatch(payload, policy);
     await saveStore(store);
-    sendJson(response, 200, store.devices[deviceRoute.deviceId]);
+    sendJson(response, 200, withPolicySignature(store.devices[deviceRoute.deviceId]));
     return;
   }
 
